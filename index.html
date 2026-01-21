@@ -7,14 +7,18 @@
     <meta name="theme-color" content="#1e293b" />
     <meta name="description" content="Professional Certificate Generator" />
     <title>EduCert Pro</title>
+    <link rel="stylesheet" href="/styles.css" />
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
+        important: true,
         theme: {
           extend: {
             fontFamily: {
               serif: ['Times New Roman', 'serif'],
               sans: ['Inter', 'sans-serif'],
+              signature: ['Great Vibes', 'cursive'],
+              official: ['Playfair Display', 'serif'],
             },
             colors: {
               navy: {
@@ -33,6 +37,9 @@
                 800: '#794014',
                 900: '#643615',
               }
+            },
+            backgroundColor: {
+              'base': '#f1f5f9',
             }
           },
         },
@@ -41,16 +48,13 @@
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Great+Vibes&family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@400;700&display=swap');
       
+      html {
+        background-color: #f1f5f9 !important;
+      }
+      
       body {
-        font-family: 'Inter', sans-serif;
-      }
-      
-      .font-signature {
-        font-family: 'Great Vibes', cursive;
-      }
-      
-      .font-official {
-        font-family: 'Playfair Display', serif;
+        background-color: #f1f5f9 !important;
+        background-color: var(--bg-base, #f1f5f9) !important;
       }
 
       @media print {
@@ -61,40 +65,37 @@
         
         body {
           visibility: hidden;
-          background: white;
+          background: white !important;
           -webkit-print-color-adjust: exact !important;
           print-color-adjust: exact !important;
         }
         
-        /* Hide everything by default */
         body * {
           visibility: hidden;
         }
 
-        /* Show the print area */
-        .print-area, .print-area * {
+        #certificate-to-download,
+        #certificate-to-download * {
           visibility: visible !important;
         }
 
-        .print-area {
-          position: fixed;
-          left: 0;
-          top: 0;
-          width: 100vw;
-          height: 100vh;
-          margin: 0;
-          padding: 0;
-          z-index: 9999;
-          background: white;
-          display: flex;
-          align-items: center;
-          justify-content: center;
+        #certificate-to-download {
+          position: fixed !important;
+          left: 0 !important;
+          top: 0 !important;
+          width: 100vw !important;
+          height: 100vh !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          z-index: 9999 !important;
+          background: white !important;
         }
 
         .certificate-container {
-          transform: scale(1); /* Ensure no scaling issues */
+          transform: scale(1) !important;
           box-shadow: none !important;
           margin: 0 !important;
+          padding: 0 !important;
         }
         
         .no-print {
@@ -102,20 +103,9 @@
         }
       }
     </style>
-  <script type="importmap">
-{
-  "imports": {
-    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "react": "https://esm.sh/react@^19.2.3",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "html2canvas": "https://esm.sh/html2canvas@1.4.1",
-    "jspdf": "https://esm.sh/jspdf@2.5.1"
-  }
-}
-</script>
-</head>
+  </head>
   <body class="bg-slate-100 text-slate-900">
     <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
   </body>
 </html>
