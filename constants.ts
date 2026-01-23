@@ -62,7 +62,12 @@ export const DEFAULT_DATA: AppData = {
 };
 
 export const STORAGE_KEY = 'certigen_data_v2';
-export const ADMIN_CREDENTIALS = {
-  username: 'Administrator',
-  password: 'Admin@123'
-};
+export const USERS_KEY = 'certigen_users_v1';
+
+export const SECURITY_QUESTIONS = [
+  "What was the name of your first pet?",
+  "What is your mother's maiden name?",
+  "What was the name of your first school?",
+  "What is your favorite food?",
+  "What city were you born in?"
+];

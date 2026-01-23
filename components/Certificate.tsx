@@ -5,7 +5,6 @@ import {
   ModernTemplate, 
   CorporateTemplate, 
   ElegantTemplate, 
-  TechTemplate,
   ArtisticTemplate
 } from './CertificateTemplates';
 
@@ -71,7 +70,6 @@ const Certificate: React.FC<CertificateProps> = ({ data, settings }) => {
       case 'modern': return <ModernTemplate {...templateProps} />;
       case 'corporate': return <CorporateTemplate {...templateProps} />;
       case 'elegant': return <ElegantTemplate {...templateProps} />;
-      case 'tech': return <TechTemplate {...templateProps} />;
       case 'artistic': return <ArtisticTemplate {...templateProps} />;
       case 'classic': default: return <ClassicTemplate {...templateProps} />;
     }

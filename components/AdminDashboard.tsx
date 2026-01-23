@@ -1,24 +1,51 @@
 import React, { useState } from 'react';
-import { AppData } from '../types';
-import { fileToBase64, saveAppData } from '../utils/storage';
-import { Trash2, Plus, Save, Settings, BookOpen, Clock, FileBadge, LayoutTemplate, CheckCircle2, Palette } from 'lucide-react';
+import { AppData, UserProfile } from '../types';
+import { fileToBase64, saveAppData, updateUserPassword } from '../utils/storage';
+import { Trash2, Plus, Save, Settings, BookOpen, Clock, FileBadge, LayoutTemplate, CheckCircle2, Palette, User, Lock, KeyRound } from 'lucide-react';
 
 interface AdminDashboardProps {
   data: AppData;
+  currentUser: UserProfile;
   onUpdate: (newData: AppData) => void;
   onLogout: () => void;
 }
 
-const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, onUpdate }) => {
-  const [activeTab, setActiveTab] = useState<'general' | 'appearance' | 'templates' | 'courses' | 'durations' | 'types'>('general');
+const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, currentUser, onUpdate }) => {
+  const [activeTab, setActiveTab] = useState<'general' | 'appearance' | 'account' | 'templates' | 'courses' | 'durations' | 'types'>('general');
   const [tempData, setTempData] = useState<AppData>(data);
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Account State
+  const [passForm, setPassForm] = useState({ current: '', new: '', confirm: '' });
+  const [passMsg, setPassMsg] = useState({ type: '', text: '' });
 
   const handleSave = () => {
     setIsSaving(true);
     saveAppData(tempData);
     onUpdate(tempData);
     setTimeout(() => setIsSaving(false), 800);
+  };
+
+  const handlePasswordChange = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passForm.current !== currentUser.password) {
+      setPassMsg({ type: 'error', text: 'Current password is incorrect.' });
+      return;
+    }
+    if (passForm.new !== passForm.confirm) {
+       setPassMsg({ type: 'error', text: 'New passwords do not match.' });
+       return;
+    }
+    if (passForm.new.length < 4) {
+      setPassMsg({ type: 'error', text: 'Password must be at least 4 characters.' });
+      return;
+    }
+
+    updateUserPassword(currentUser.email, passForm.new);
+    // Update local session current user password reference so further changes don't fail immediately
+    currentUser.password = passForm.new; 
+    setPassMsg({ type: 'success', text: 'Password updated successfully!' });
+    setPassForm({ current: '', new: '', confirm: '' });
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, key: keyof typeof tempData.institute) => {
@@ -63,6 +90,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, onUpdate }) => {
         
         <button onClick={() => setActiveTab('general')} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all font-medium text-sm ${activeTab === 'general' ? 'bg-indigo-600 text-white shadow-md' : 'hover:bg-white hover:shadow text-slate-600'}`}>
           <Settings size={18} /> General Settings
+        </button>
+        <button onClick={() => setActiveTab('account')} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all font-medium text-sm ${activeTab === 'account' ? 'bg-indigo-600 text-white shadow-md' : 'hover:bg-white hover:shadow text-slate-600'}`}>
+          <User size={18} /> My Account
         </button>
         <button onClick={() => setActiveTab('appearance')} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all font-medium text-sm ${activeTab === 'appearance' ? 'bg-indigo-600 text-white shadow-md' : 'hover:bg-white hover:shadow text-slate-600'}`}>
           <Palette size={18} /> Appearance
@@ -134,6 +164,50 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, onUpdate }) => {
                  </div>
                ))}
             </div>
+          </div>
+        )}
+
+        {/* ACCOUNT SETTINGS */}
+        {activeTab === 'account' && (
+          <div className="space-y-6 max-w-xl">
+            <h3 className="text-2xl font-bold text-slate-800 border-b pb-4 mb-4">My Account</h3>
+            
+            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-6 flex items-center gap-4">
+               <div className="bg-indigo-100 p-3 rounded-full text-indigo-600">
+                  <User size={24} />
+               </div>
+               <div>
+                  <p className="text-xs text-slate-500 uppercase font-bold">Logged in as</p>
+                  <p className="text-lg font-bold text-slate-800">{currentUser.email}</p>
+               </div>
+            </div>
+
+            <form onSubmit={handlePasswordChange} className="space-y-4">
+               <h4 className="font-bold text-slate-700 flex items-center gap-2"><Lock size={16}/> Change Password</h4>
+               
+               {passMsg.text && (
+                 <div className={`p-3 rounded text-sm ${passMsg.type === 'error' ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-green-50 text-green-600 border border-green-100'}`}>
+                   {passMsg.text}
+                 </div>
+               )}
+
+               <div className="space-y-2">
+                 <label className="text-sm font-semibold text-slate-600">Current Password</label>
+                 <input type="password" required value={passForm.current} onChange={e => setPassForm({...passForm, current: e.target.value})} className={inputClass} placeholder="Enter current password" />
+               </div>
+               <div className="space-y-2">
+                 <label className="text-sm font-semibold text-slate-600">New Password</label>
+                 <input type="password" required minLength={4} value={passForm.new} onChange={e => setPassForm({...passForm, new: e.target.value})} className={inputClass} placeholder="Enter new password" />
+               </div>
+               <div className="space-y-2">
+                 <label className="text-sm font-semibold text-slate-600">Confirm New Password</label>
+                 <input type="password" required minLength={4} value={passForm.confirm} onChange={e => setPassForm({...passForm, confirm: e.target.value})} className={inputClass} placeholder="Confirm new password" />
+               </div>
+
+               <button type="submit" className="bg-navy-900 text-white px-6 py-3 rounded-lg font-bold hover:bg-navy-800 transition shadow-md flex items-center gap-2">
+                  <KeyRound size={18} /> Update Password
+               </button>
+            </form>
           </div>
         )}
 
@@ -210,7 +284,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, onUpdate }) => {
                     { id: 'modern', name: 'Modern Professional', desc: 'Clean sidebar layout with bold headers.', color: 'bg-slate-800' },
                     { id: 'corporate', name: 'Corporate Experience', desc: 'Grid-based blue theme for employees.', color: 'bg-blue-900' },
                     { id: 'elegant', name: 'Elegant Gold', desc: 'Luxury feel with script fonts and gold accents.', color: 'bg-orange-50' },
-                    { id: 'tech', name: 'Tech Modern', desc: 'Geometric dark theme for technical courses.', color: 'bg-slate-900' },
                     { id: 'artistic', name: 'Artistic Ink', desc: 'Creative watercolor style layout.', color: 'bg-[#fdfbf7]' },
                   ].map((t) => (
                     <div 
@@ -220,7 +293,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, onUpdate }) => {
                           ${tempData.activeTemplate === t.id ? 'border-indigo-600 shadow-xl ring-2 ring-indigo-200 scale-[1.02]' : 'border-slate-200 hover:border-indigo-300 hover:shadow-md'}`}
                     >
                         <div className={`h-32 w-full flex items-center justify-center border-b border-slate-100 ${t.color}`}>
-                          <span className={`font-bold text-lg ${t.id === 'modern' || t.id === 'corporate' || t.id === 'tech' ? 'text-white' : 'text-slate-500'}`}>{t.name}</span>
+                          <span className={`font-bold text-lg ${t.id === 'modern' || t.id === 'corporate' ? 'text-white' : 'text-slate-500'}`}>{t.name}</span>
                         </div>
                         <div className="p-4 bg-white">
                           <div className="flex justify-between items-center mb-2">

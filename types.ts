@@ -41,11 +41,18 @@ export interface StudentCertificateData {
   issueDate: string;
 }
 
+export interface UserProfile {
+  email: string;
+  password: string;
+  securityQuestion: string;
+  securityAnswer: string;
+}
+
 export interface AppData {
   institute: InstituteDetails;
   courses: Course[];
   durations: Duration[];
   types: CertificateType[];
-  activeTemplate: 'classic' | 'modern' | 'corporate' | 'elegant' | 'tech' | 'artistic';
+  activeTemplate: 'classic' | 'modern' | 'corporate' | 'elegant' | 'artistic';
   appTheme: 'light' | 'dark' | 'midnight';
 }

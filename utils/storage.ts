@@ -1,10 +1,7 @@
-import { AppData } from '../types';
-import { DEFAULT_DATA, STORAGE_KEY } from '../constants';
+import { AppData, UserProfile } from '../types';
+import { DEFAULT_DATA, STORAGE_KEY, USERS_KEY } from '../constants';
 
-// We use LocalStorage for simplicity as it covers text data well. 
-// Modern browsers support 5-10MB in LocalStorage which is enough for a few optimized base64 images.
-// For a production heavy app, IndexedDB is preferred, but this meets the "offline" requirement perfectly.
-
+// Data Management
 export const saveAppData = (data: AppData): void => {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -32,4 +29,38 @@ export const fileToBase64 = (file: File): Promise<string> => {
     reader.onload = () => resolve(reader.result as string);
     reader.onerror = (error) => reject(error);
   });
+};
+
+// User Management
+export const getUsers = (): UserProfile[] => {
+  try {
+    const stored = localStorage.getItem(USERS_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch (error) {
+    return [];
+  }
+};
+
+export const saveUser = (user: UserProfile): boolean => {
+  const users = getUsers();
+  if (users.some(u => u.email === user.email)) {
+    return false; // User exists
+  }
+  users.push(user);
+  localStorage.setItem(USERS_KEY, JSON.stringify(users));
+  return true;
+};
+
+export const findUser = (email: string): UserProfile | undefined => {
+  const users = getUsers();
+  return users.find(u => u.email === email);
+};
+
+export const updateUserPassword = (email: string, newPassword: string): void => {
+  const users = getUsers();
+  const index = users.findIndex(u => u.email === email);
+  if (index !== -1) {
+    users[index].password = newPassword;
+    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+  }
 };

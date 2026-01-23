@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Download, ArrowLeft, RefreshCw, FileCheck, Lock, User, Settings, LogOut, LayoutDashboard, Loader2, Maximize2 } from 'lucide-react';
-import { AppData, StudentCertificateData } from './types';
-import { getAppData } from './utils/storage';
-import { ADMIN_CREDENTIALS } from './constants';
+import { Shield, Download, ArrowLeft, RefreshCw, FileCheck, Lock, User, Settings, LogOut, LayoutDashboard, Loader2, Maximize2, Mail, KeyRound, HelpCircle, Send, X, Bell } from 'lucide-react';
+import { AppData, StudentCertificateData, UserProfile } from './types';
+import { getAppData, findUser, saveUser, updateUserPassword } from './utils/storage';
+import { SECURITY_QUESTIONS } from './constants';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 
@@ -10,21 +10,46 @@ import { jsPDF } from 'jspdf';
 import AdminDashboard from './components/AdminDashboard';
 import Certificate from './components/Certificate';
 
-type ViewMode = 'login' | 'generator' | 'settings' | 'preview';
+type ViewMode = 'auth' | 'generator' | 'settings' | 'preview';
+type AuthMode = 'login' | 'signup' | 'forgot' | 'otp';
 
 function App() {
   const [appData, setAppData] = useState<AppData | null>(null);
-  const [view, setView] = useState<ViewMode>('login');
+  const [view, setView] = useState<ViewMode>('auth');
   
-  // Login State
-  const [usernameInput, setUsernameInput] = useState('');
+  // Auth State
+  const [authMode, setAuthMode] = useState<AuthMode>('login');
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  
+  // Login Inputs
+  const [emailInput, setEmailInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
-  const [loginError, setLoginError] = useState(false);
   
-  // PDF Generation State
+  // Signup Inputs
+  const [signupEmail, setSignupEmail] = useState('');
+  const [signupPass, setSignupPass] = useState('');
+  const [signupConfirm, setSignupConfirm] = useState('');
+  const [signupQuestion, setSignupQuestion] = useState(SECURITY_QUESTIONS[0]);
+  const [signupAnswer, setSignupAnswer] = useState('');
+
+  // OTP State
+  const [generatedOtp, setGeneratedOtp] = useState('');
+  const [otpInput, setOtpInput] = useState('');
+  const [pendingUser, setPendingUser] = useState<UserProfile | null>(null);
+  
+  // Mock Email Notification State
+  const [mockEmail, setMockEmail] = useState<{to: string, code: string} | null>(null);
+
+  // Forgot Password Inputs
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotAnswer, setForgotAnswer] = useState('');
+  const [newPass, setNewPass] = useState('');
+  const [securityQuestionToDisplay, setSecurityQuestionToDisplay] = useState<string | null>(null);
+
+  const [authMsg, setAuthMsg] = useState({ type: '', text: '' });
+
+  // Certificate Form State
   const [isDownloading, setIsDownloading] = useState(false);
-  
-  // Form State
   const [formData, setFormData] = useState<StudentCertificateData>({
     id: '',
     certificateNo: '',
@@ -45,20 +70,158 @@ function App() {
     setAppData(data);
   }, []);
 
+  // Clear mock email after 10 seconds if not closed
+  useEffect(() => {
+    if (mockEmail) {
+        const timer = setTimeout(() => setMockEmail(null), 15000); // 15 seconds visibility
+        return () => clearTimeout(timer);
+    }
+  }, [mockEmail]);
+
+  const clearAuthForms = () => {
+    setEmailInput(''); setPasswordInput('');
+    setSignupEmail(''); setSignupPass(''); setSignupConfirm(''); setSignupAnswer('');
+    setForgotEmail(''); setForgotAnswer(''); setNewPass('');
+    setOtpInput(''); setGeneratedOtp(''); setPendingUser(null);
+    setAuthMsg({ type: '', text: '' });
+    setSecurityQuestionToDisplay(null);
+    setMockEmail(null);
+  };
+
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (usernameInput === ADMIN_CREDENTIALS.username && passwordInput === ADMIN_CREDENTIALS.password) {
+    const email = emailInput.trim().toLowerCase();
+    
+    const user = findUser(email);
+    
+    if (user && user.password === passwordInput) {
+      setCurrentUser(user);
       setView('generator');
-      setUsernameInput('');
-      setPasswordInput('');
-      setLoginError(false);
+      clearAuthForms();
     } else {
-      setLoginError(true);
+      setAuthMsg({ type: 'error', text: 'Invalid Gmail or Password.' });
+    }
+  };
+
+  const handleSignup = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const email = signupEmail.trim().toLowerCase();
+
+    // 1. STRICT GMAIL VALIDATION
+    if (!email.endsWith('@gmail.com')) {
+      setAuthMsg({ type: 'error', text: 'Registration restricted: Please use a valid @gmail.com address.' });
+      return;
+    }
+
+    if (findUser(email)) {
+      setAuthMsg({ type: 'error', text: 'This Gmail address is already registered.' });
+      return;
+    }
+
+    if (signupPass !== signupConfirm) {
+      setAuthMsg({ type: 'error', text: 'Passwords do not match.' });
+      return;
+    }
+    if (signupPass.length < 4) {
+      setAuthMsg({ type: 'error', text: 'Password must be at least 4 characters.' });
+      return;
+    }
+    
+    // 2. GENERATE OTP & PREPARE PENDING USER
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    setGeneratedOtp(code);
+    
+    setPendingUser({
+      email: email,
+      password: signupPass,
+      securityQuestion: signupQuestion,
+      securityAnswer: signupAnswer
+    });
+
+    // 3. SHOW MOCK EMAIL NOTIFICATION
+    setMockEmail({ to: email, code: code });
+
+    setAuthMode('otp');
+    setAuthMsg({ type: 'success', text: `Verification code sent to ${email}` });
+  };
+
+  const handleVerifyOtp = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (otpInput === generatedOtp && pendingUser) {
+      // Create User
+      const success = saveUser(pendingUser);
+      
+      if (success) {
+        setAuthMsg({ type: 'success', text: 'Email Verified! Account created successfully.' });
+        setAuthMode('login');
+        setEmailInput(pendingUser.email);
+        
+        // Cleanup
+        setPendingUser(null);
+        setGeneratedOtp('');
+        setOtpInput('');
+        setMockEmail(null);
+      } else {
+        setAuthMsg({ type: 'error', text: 'Error creating account. User might exist.' });
+      }
+    } else {
+      setAuthMsg({ type: 'error', text: 'Invalid OTP Code. Please try again.' });
+    }
+  };
+
+  const handleResendOtp = () => {
+    if (!pendingUser) return;
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    setGeneratedOtp(code);
+    setMockEmail({ to: pendingUser.email, code: code });
+    setAuthMsg({ type: 'success', text: 'New OTP sent.' });
+  };
+
+  const checkEmailForRecovery = () => {
+    const email = forgotEmail.trim().toLowerCase();
+    
+    if (!email.endsWith('@gmail.com')) {
+       setAuthMsg({ type: 'error', text: 'Please enter a valid @gmail.com address.' });
+       return;
+    }
+
+    const user = findUser(email);
+    if (user) {
+      setSecurityQuestionToDisplay(user.securityQuestion);
+      setAuthMsg({ type: '', text: '' });
+    } else {
+      setAuthMsg({ type: 'error', text: 'Gmail account not found.' });
+      setSecurityQuestionToDisplay(null);
+    }
+  };
+
+  const handleResetPassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    const email = forgotEmail.trim().toLowerCase();
+    const user = findUser(email);
+
+    if (user && user.securityAnswer.toLowerCase() === forgotAnswer.toLowerCase()) {
+      if(newPass.length < 4) {
+         setAuthMsg({ type: 'error', text: 'Password must be at least 4 chars.' });
+         return;
+      }
+      updateUserPassword(email, newPass);
+      setAuthMsg({ type: 'success', text: 'Password reset successful! Login now.' });
+      setTimeout(() => {
+        setAuthMode('login');
+        setEmailInput(email);
+      }, 1500);
+    } else {
+      setAuthMsg({ type: 'error', text: 'Incorrect Security Answer.' });
     }
   };
 
   const handleLogout = () => {
-    setView('login');
+    setCurrentUser(null);
+    setView('auth');
+    setAuthMode('login');
   };
 
   const handleGenerateCertificate = (e: React.FormEvent) => {
@@ -67,7 +230,6 @@ function App() {
       alert("Please select Course and Certificate Type");
       return;
     }
-    // Generate a pseudo-random ID for the certificate if empty
     if (!formData.id) {
         setFormData(prev => ({...prev, id: crypto.randomUUID()}));
     }
@@ -82,7 +244,6 @@ function App() {
     
     try {
         const isPortrait = formData.orientation === 'portrait';
-        // A4 Landscape: 1123x794px | Portrait: 794x1123px (CSS Pixels)
         const width = isPortrait ? 794 : 1123;
         const height = isPortrait ? 1123 : 794;
 
@@ -115,7 +276,7 @@ function App() {
 
     } catch (err) {
         console.error("PDF Download failed:", err);
-        alert("Failed to download PDF. Please check console for errors.");
+        alert("Failed to download PDF.");
     } finally {
         setIsDownloading(false);
     }
@@ -127,18 +288,46 @@ function App() {
   const themeClasses = {
     light: 'bg-slate-100 text-slate-900',
     dark: 'bg-slate-950 text-slate-200',
-    midnight: 'bg-[#0a192f] text-gold-50', // Matching the Modern Template / Login
+    midnight: 'bg-[#0a192f] text-gold-50',
   };
   
   const currentThemeClass = themeClasses[appData.appTheme || 'light'];
 
   return (
-    <div className={`min-h-screen flex flex-col font-sans transition-colors duration-300 ${currentThemeClass}`}>
+    <div className={`min-h-screen flex flex-col font-sans transition-colors duration-300 ${currentThemeClass} relative`}>
       
-      {/* LOGIN VIEW */}
-      {view === 'login' && (
+      {/* SIMULATED EMAIL NOTIFICATION POPUP */}
+      {mockEmail && (
+        <div className="fixed top-4 right-4 z-[100] max-w-sm w-full animate-bounce-in">
+           <div className="bg-white border-l-4 border-indigo-600 rounded-lg shadow-2xl overflow-hidden">
+              <div className="bg-slate-50 p-3 border-b border-slate-100 flex justify-between items-center">
+                 <div className="flex items-center gap-2 text-indigo-700 font-bold text-sm">
+                    <Mail size={16} /> New Email (Simulation)
+                 </div>
+                 <button onClick={() => setMockEmail(null)} className="text-slate-400 hover:text-red-500">
+                    <X size={16} />
+                 </button>
+              </div>
+              <div className="p-4">
+                 <div className="text-xs text-slate-500 mb-1">To: {mockEmail.to}</div>
+                 <div className="font-bold text-slate-800 text-sm mb-2">Subject: Your Verification Code</div>
+                 <div className="bg-slate-100 p-3 rounded text-center">
+                    <span className="text-2xl font-mono font-bold tracking-widest text-indigo-700 select-all">
+                       {mockEmail.code}
+                    </span>
+                 </div>
+                 <p className="text-[10px] text-slate-400 mt-2 text-center">
+                    * Since this app is offline, we simulate the email here.
+                 </p>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* AUTH VIEW */}
+      {view === 'auth' && (
         <div className="flex-1 flex flex-col items-center justify-center p-4">
-          <div className="text-center mb-8 animate-fade-in">
+          <div className="text-center mb-6 animate-fade-in">
              <div className="bg-navy-900 text-gold-400 p-4 rounded-2xl w-20 h-20 flex items-center justify-center mx-auto mb-4 shadow-xl border border-gold-500/20">
                 <Shield size={40} />
              </div>
@@ -146,55 +335,194 @@ function App() {
              <p className="opacity-70 mt-2">Secure Certificate Management System</p>
           </div>
 
-          <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md border border-slate-200 text-slate-900">
-            <h2 className="text-xl font-bold text-slate-800 mb-6 border-b pb-2">Admin Access</h2>
+          <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md border border-slate-200 text-slate-900 relative overflow-hidden">
             
-            <form onSubmit={handleLogin} className="space-y-5">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Username</label>
-                <div className="relative">
-                  <User className="absolute left-3 top-3.5 text-slate-400" size={18} />
-                  <input 
-                    type="text" 
-                    value={usernameInput}
-                    onChange={(e) => setUsernameInput(e.target.value)}
-                    className="w-full border border-slate-300 rounded-lg p-3 pl-10 bg-slate-50 text-slate-900 focus:ring-2 focus:ring-navy-800 focus:border-transparent outline-none transition-all"
-                    placeholder="Enter username"
-                    autoFocus
-                  />
-                </div>
+            {/* LOGIN FORM */}
+            {authMode === 'login' && (
+              <div className="animate-fade-in">
+                <h2 className="text-xl font-bold text-slate-800 mb-6 border-b pb-2 flex items-center gap-2">
+                   <Lock size={20} className="text-indigo-600"/> Login
+                </h2>
+                <form onSubmit={handleLogin} className="space-y-5">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Gmail Address</label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-3.5 text-slate-400" size={18} />
+                      <input type="email" required value={emailInput} onChange={(e) => setEmailInput(e.target.value)} className="w-full border border-slate-300 rounded-lg p-3 pl-10 bg-slate-50 text-slate-900 focus:ring-2 focus:ring-navy-800 outline-none" placeholder="you@gmail.com" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
+                    <div className="relative">
+                      <KeyRound className="absolute left-3 top-3.5 text-slate-400" size={18} />
+                      <input type="password" required value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} className="w-full border border-slate-300 rounded-lg p-3 pl-10 bg-slate-50 text-slate-900 focus:ring-2 focus:ring-navy-800 outline-none" placeholder="Enter password" />
+                    </div>
+                    <div className="text-right mt-1">
+                      <button type="button" onClick={() => { clearAuthForms(); setAuthMode('forgot'); }} className="text-xs text-indigo-600 hover:underline">Forgot Password?</button>
+                    </div>
+                  </div>
+                  
+                  {authMsg.text && (
+                    <div className={`p-3 rounded text-sm text-center border ${authMsg.type === 'error' ? 'bg-red-50 text-red-600 border-red-100' : 'bg-green-50 text-green-600 border-green-100'}`}>
+                      {authMsg.text}
+                    </div>
+                  )}
+                  
+                  <button type="submit" className="w-full bg-navy-900 text-white py-3.5 rounded-lg font-bold hover:bg-navy-800 transition shadow-lg">Login</button>
+                  
+                  <div className="text-center text-sm text-slate-600 mt-4">
+                     Don't have an account? <button type="button" onClick={() => { clearAuthForms(); setAuthMode('signup'); }} className="text-indigo-600 font-bold hover:underline">Sign Up with Gmail</button>
+                  </div>
+                </form>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-3.5 text-slate-400" size={18} />
-                  <input 
-                    type="password" 
-                    value={passwordInput}
-                    onChange={(e) => setPasswordInput(e.target.value)}
-                    className="w-full border border-slate-300 rounded-lg p-3 pl-10 bg-slate-50 text-slate-900 focus:ring-2 focus:ring-navy-800 focus:border-transparent outline-none transition-all"
-                    placeholder="Enter password"
-                  />
-                </div>
+            )}
+
+            {/* SIGNUP FORM */}
+            {authMode === 'signup' && (
+              <div className="animate-fade-in">
+                <h2 className="text-xl font-bold text-slate-800 mb-6 border-b pb-2 flex items-center gap-2">
+                   <User size={20} className="text-indigo-600"/> Create Account
+                </h2>
+                <form onSubmit={handleSignup} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Gmail Address (@gmail.com)</label>
+                    <input type="email" required value={signupEmail} onChange={(e) => setSignupEmail(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-slate-900 focus:ring-2 focus:ring-navy-800 outline-none" placeholder="you@gmail.com" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Password</label>
+                      <input type="password" required minLength={4} value={signupPass} onChange={(e) => setSignupPass(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-slate-900 focus:ring-2 focus:ring-navy-800 outline-none" placeholder="****" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Confirm</label>
+                      <input type="password" required minLength={4} value={signupConfirm} onChange={(e) => setSignupConfirm(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-slate-900 focus:ring-2 focus:ring-navy-800 outline-none" placeholder="****" />
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                     <p className="text-xs text-slate-400 mb-2 font-medium">Security Question (for password recovery)</p>
+                     <div className="space-y-2">
+                        <select value={signupQuestion} onChange={e => setSignupQuestion(e.target.value)} className="w-full text-sm border border-slate-300 rounded p-2 text-slate-700">
+                           {SECURITY_QUESTIONS.map((q, i) => <option key={i} value={q}>{q}</option>)}
+                        </select>
+                        <input type="text" required value={signupAnswer} onChange={e => setSignupAnswer(e.target.value)} className="w-full text-sm border border-slate-300 rounded p-2 text-slate-900" placeholder="Your Answer" />
+                     </div>
+                  </div>
+
+                  {authMsg.text && (
+                    <div className={`p-2 rounded text-xs text-center border ${authMsg.type === 'error' ? 'bg-red-50 text-red-600 border-red-100' : 'bg-green-50 text-green-600 border-green-100'}`}>
+                      {authMsg.text}
+                    </div>
+                  )}
+
+                  <button type="submit" className="w-full bg-indigo-600 text-white py-3 rounded-lg font-bold hover:bg-indigo-700 transition shadow-md">Sign Up</button>
+                  
+                  <div className="text-center text-sm text-slate-600 mt-2">
+                     Already have an account? <button type="button" onClick={() => { clearAuthForms(); setAuthMode('login'); }} className="text-navy-900 font-bold hover:underline">Login</button>
+                  </div>
+                </form>
               </div>
-              
-              {loginError && (
-                <div className="bg-red-50 text-red-600 p-3 rounded text-sm text-center border border-red-100 font-medium">
-                  Invalid Username or Password.
-                </div>
-              )}
-              
-              <button type="submit" className="w-full bg-navy-900 text-white py-3.5 rounded-lg font-bold hover:bg-navy-800 transition shadow-lg transform active:scale-[0.98]">
-                Login to Portal
-              </button>
-            </form>
+            )}
+
+            {/* OTP VERIFICATION FORM */}
+            {authMode === 'otp' && (
+               <div className="animate-fade-in">
+                  <h2 className="text-xl font-bold text-slate-800 mb-6 border-b pb-2 flex items-center gap-2">
+                     <Send size={20} className="text-indigo-600"/> Verify Email
+                  </h2>
+                  <div className="mb-6 text-center">
+                    <div className="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <Mail className="text-indigo-600" size={32} />
+                    </div>
+                    <p className="text-sm text-slate-600">
+                       We have sent a 6-digit verification code to <br/>
+                       <span className="font-bold text-slate-900">{pendingUser?.email}</span>
+                    </p>
+                    <p className="text-xs text-red-500 mt-2 font-bold animate-pulse">
+                       Check the simulated email popup on your screen!
+                    </p>
+                  </div>
+
+                  <form onSubmit={handleVerifyOtp} className="space-y-4">
+                     <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1 uppercase text-center">Enter 6-Digit Code</label>
+                        <input 
+                           type="text" 
+                           maxLength={6}
+                           value={otpInput} 
+                           onChange={(e) => setOtpInput(e.target.value.replace(/[^0-9]/g, ''))} 
+                           className="w-full border-2 border-slate-300 rounded-lg p-3 text-center text-2xl tracking-[0.5em] font-mono text-slate-900 focus:ring-2 focus:ring-navy-800 focus:border-navy-800 outline-none transition-all" 
+                           placeholder="000000" 
+                           autoFocus
+                        />
+                     </div>
+
+                     {authMsg.text && (
+                        <div className={`p-2 rounded text-xs text-center border ${authMsg.type === 'error' ? 'bg-red-50 text-red-600 border-red-100' : 'bg-green-50 text-green-600 border-green-100'}`}>
+                           {authMsg.text}
+                        </div>
+                     )}
+
+                     <button type="submit" className="w-full bg-navy-900 text-white py-3 rounded-lg font-bold hover:bg-navy-800 transition shadow-md">Verify & Create Account</button>
+                     
+                     <div className="flex justify-between text-xs mt-4">
+                        <button type="button" onClick={() => { setAuthMode('signup'); setPendingUser(null); setMockEmail(null); }} className="text-slate-500 hover:text-slate-800">Change Email</button>
+                        <button type="button" onClick={handleResendOtp} className="text-indigo-600 font-bold hover:underline">Resend Code</button>
+                     </div>
+                  </form>
+               </div>
+            )}
+
+            {/* FORGOT PASSWORD FORM */}
+            {authMode === 'forgot' && (
+              <div className="animate-fade-in">
+                <h2 className="text-xl font-bold text-slate-800 mb-6 border-b pb-2 flex items-center gap-2">
+                   <HelpCircle size={20} className="text-indigo-600"/> Recovery
+                </h2>
+                
+                {!securityQuestionToDisplay ? (
+                  <div className="space-y-4">
+                     <p className="text-sm text-slate-600">Enter your Gmail address to retrieve your security question.</p>
+                     <div>
+                        <input type="email" required value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)} className="w-full border border-slate-300 rounded-lg p-3 text-slate-900 focus:ring-2 focus:ring-navy-800 outline-none" placeholder="you@gmail.com" />
+                     </div>
+                     {authMsg.text && <div className="text-xs text-red-500 text-center">{authMsg.text}</div>}
+                     <button type="button" onClick={checkEmailForRecovery} className="w-full bg-navy-900 text-white py-3 rounded-lg font-bold hover:bg-navy-800 transition">Next</button>
+                     <button type="button" onClick={() => { clearAuthForms(); setAuthMode('login'); }} className="w-full text-slate-500 py-2 text-sm hover:text-slate-800">Cancel</button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleResetPassword} className="space-y-4">
+                     <div className="bg-indigo-50 p-3 rounded border border-indigo-100 text-indigo-900 text-sm font-medium mb-2">
+                        {securityQuestionToDisplay}
+                     </div>
+                     <div>
+                        <input type="text" required value={forgotAnswer} onChange={e => setForgotAnswer(e.target.value)} className="w-full border border-slate-300 rounded-lg p-3 text-slate-900 focus:ring-2 focus:ring-navy-800 outline-none" placeholder="Your Security Answer" autoFocus />
+                     </div>
+                     <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">New Password</label>
+                        <input type="password" required minLength={4} value={newPass} onChange={e => setNewPass(e.target.value)} className="w-full border border-slate-300 rounded-lg p-3 text-slate-900 focus:ring-2 focus:ring-navy-800 outline-none" placeholder="****" />
+                     </div>
+
+                     {authMsg.text && (
+                        <div className={`p-2 rounded text-xs text-center border ${authMsg.type === 'error' ? 'bg-red-50 text-red-600 border-red-100' : 'bg-green-50 text-green-600 border-green-100'}`}>
+                           {authMsg.text}
+                        </div>
+                     )}
+
+                     <button type="submit" className="w-full bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700 transition shadow-md">Reset Password</button>
+                     <button type="button" onClick={() => { clearAuthForms(); setAuthMode('login'); }} className="w-full text-slate-500 py-2 text-sm hover:text-slate-800">Cancel</button>
+                  </form>
+                )}
+              </div>
+            )}
+
           </div>
           <p className="mt-8 text-xs opacity-50">© 2024 EduCert Pro. All Rights Reserved.</p>
         </div>
       )}
 
       {/* AUTHENTICATED VIEWS */}
-      {view !== 'login' && (
+      {view !== 'auth' && currentUser && (
         <>
           {/* HEADER (Hidden when printing) */}
           <header className="bg-navy-900 text-white shadow-md no-print sticky top-0 z-50 border-b border-white/10">
@@ -205,7 +533,9 @@ function App() {
                 </div>
                 <div>
                   <h1 className="text-lg font-bold tracking-tight text-white leading-none">EduCert Pro</h1>
-                  <span className="text-[10px] text-gold-400 font-medium uppercase tracking-wider">Admin Portal</span>
+                  <span className="text-[10px] text-gold-400 font-medium uppercase tracking-wider">
+                     {currentUser.email}
+                  </span>
                 </div>
               </div>
 
@@ -423,13 +753,14 @@ function App() {
             )}
 
             {/* SETTINGS VIEW */}
-            {view === 'settings' && (
+            {view === 'settings' && currentUser && (
               <AdminDashboard 
                 data={appData} 
+                currentUser={currentUser}
                 onUpdate={(newData) => {
                   setAppData(newData);
                 }} 
-                onLogout={handleLogout} // Passed but unused in internal UI now
+                onLogout={handleLogout}
               />
             )}
 
