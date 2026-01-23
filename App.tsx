@@ -1,16 +1,18 @@
+
 import React, { useState, useEffect } from 'react';
-import { Shield, Download, ArrowLeft, RefreshCw, FileCheck, Lock, User, Settings, LogOut, LayoutDashboard, Loader2, Maximize2, Mail, KeyRound, HelpCircle, Send, X, Bell } from 'lucide-react';
-import { AppData, StudentCertificateData, UserProfile } from './types';
-import { getAppData, findUser, saveUser, updateUserPassword } from './utils/storage';
+import { Shield, Download, ArrowLeft, RefreshCw, FileCheck, Lock, User, Settings, LogOut, LayoutDashboard, Loader2, Maximize2, Mail, KeyRound, HelpCircle, Send, X, Bell, CreditCard, CheckCircle, AlertTriangle, Phone } from 'lucide-react';
+import { AppData, StudentCertificateData, UserProfile, LicenseInfo } from './types';
+import { getAppData, findUser, saveUser, updateUserPassword, updateUserLicense, addPayment, validateAndUseKey } from './utils/storage';
 import { SECURITY_QUESTIONS } from './constants';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 
 // Components
 import AdminDashboard from './components/AdminDashboard';
+import SuperAdminPortal from './components/SuperAdminPortal';
 import Certificate from './components/Certificate';
 
-type ViewMode = 'auth' | 'generator' | 'settings' | 'preview';
+type ViewMode = 'auth' | 'generator' | 'settings' | 'preview' | 'license' | 'super_admin' | 'pending_approval';
 type AuthMode = 'login' | 'signup' | 'forgot' | 'otp';
 
 function App() {
@@ -45,6 +47,11 @@ function App() {
   const [forgotAnswer, setForgotAnswer] = useState('');
   const [newPass, setNewPass] = useState('');
   const [securityQuestionToDisplay, setSecurityQuestionToDisplay] = useState<string | null>(null);
+
+  // License & Payment State
+  const [activationKey, setActivationKey] = useState('');
+  const [paymentForm, setPaymentForm] = useState({ method: 'easypaisa', sender: '', tid: '', amount: '5000' });
+  const [licenseMsg, setLicenseMsg] = useState({ type: '', text: '' });
 
   const [authMsg, setAuthMsg] = useState({ type: '', text: '' });
 
@@ -95,11 +102,39 @@ function App() {
     const user = findUser(email);
     
     if (user && user.password === passwordInput) {
+      if (user.isBlocked) {
+        setAuthMsg({ type: 'error', text: 'Account Blocked. Contact Admin.' });
+        return;
+      }
+
       setCurrentUser(user);
-      setView('generator');
       clearAuthForms();
+
+      // ROUTING LOGIC
+      if (user.isAdmin) {
+          setView('super_admin');
+          return;
+      }
+
+      if (!user.isApproved) {
+          setView('pending_approval');
+          return;
+      }
+      
+      // Check License Logic
+      const isExpired = new Date(user.license.expiryDate) < new Date();
+      if (isExpired && user.license.status !== 'active') {
+        user.license.status = 'expired';
+        updateUserLicense(user.email, user.license);
+      }
+
+      if (user.license.status === 'expired') {
+        setView('license'); // Force license view
+      } else {
+        setView('generator');
+      }
     } else {
-      setAuthMsg({ type: 'error', text: 'Invalid Gmail or Password.' });
+      setAuthMsg({ type: 'error', text: 'Invalid Credentials.' });
     }
   };
 
@@ -136,7 +171,9 @@ function App() {
       email: email,
       password: signupPass,
       securityQuestion: signupQuestion,
-      securityAnswer: signupAnswer
+      securityAnswer: signupAnswer,
+      isApproved: false, // Explicitly false for new users
+      license: {} as any
     });
 
     // 3. SHOW MOCK EMAIL NOTIFICATION
@@ -154,7 +191,7 @@ function App() {
       const success = saveUser(pendingUser);
       
       if (success) {
-        setAuthMsg({ type: 'success', text: 'Email Verified! Account created successfully.' });
+        setAuthMsg({ type: 'success', text: 'Email Verified! Login to continue.' });
         setAuthMode('login');
         setEmailInput(pendingUser.email);
         
@@ -216,6 +253,49 @@ function App() {
     } else {
       setAuthMsg({ type: 'error', text: 'Incorrect Security Answer.' });
     }
+  };
+
+  // License Logic
+  const handleActivateKey = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser) return;
+    
+    const duration = validateAndUseKey(activationKey, currentUser.email);
+    
+    if (duration) {
+        const newLicense: LicenseInfo = {
+            ...currentUser.license,
+            status: 'active',
+            plan: 'pro',
+            expiryDate: new Date(Date.now() + duration * 24 * 60 * 60 * 1000).toISOString(),
+            activationKey: activationKey
+        };
+        updateUserLicense(currentUser.email, newLicense);
+        setCurrentUser({...currentUser, license: newLicense});
+        setLicenseMsg({ type: 'success', text: 'License Activated Successfully!' });
+        setTimeout(() => setView('generator'), 1500);
+    } else {
+        setLicenseMsg({ type: 'error', text: 'Invalid or Used Activation Key.' });
+    }
+  };
+
+  const handleSubmitPayment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser) return;
+
+    addPayment({
+        id: crypto.randomUUID(),
+        userEmail: currentUser.email,
+        method: paymentForm.method as any,
+        senderName: paymentForm.sender,
+        transactionId: paymentForm.tid,
+        amount: paymentForm.amount,
+        status: 'pending',
+        date: new Date().toISOString()
+    });
+
+    setLicenseMsg({ type: 'success', text: 'Payment proof submitted! Admin will review shortly.' });
+    setPaymentForm({ ...paymentForm, sender: '', tid: '' });
   };
 
   const handleLogout = () => {
@@ -281,6 +361,17 @@ function App() {
         setIsDownloading(false);
     }
   };
+
+  // Helper for Payment Display Details
+  const getPaymentDetails = () => {
+     switch (paymentForm.method) {
+        case 'easypaisa': return { number: '0345 9355293', title: 'Muhammad Sohail' };
+        case 'sadapay': return { number: '0335 9523835', title: 'Muhammad Sohail' };
+        case 'nayapay': return { number: '0335 9523835', title: 'Muhammad Sohail' };
+        default: return { number: '0335 9523835', title: 'Muhammad Sohail' };
+     }
+  };
+  const payDetails = getPaymentDetails();
 
   if (!appData) return <div className="min-h-screen flex items-center justify-center">Loading Data...</div>;
 
@@ -517,14 +608,24 @@ function App() {
             )}
 
           </div>
-          <p className="mt-8 text-xs opacity-50">© 2024 EduCert Pro. All Rights Reserved.</p>
+          
+          {/* Admin Contact Info on Login Screen */}
+          {view === 'auth' && (
+             <div className="mt-8 text-center text-slate-500 text-sm animate-fade-in">
+                <p className="flex items-center justify-center gap-2">
+                   <span className="font-bold text-navy-900 flex items-center gap-1"><Phone size={14}/> Admin Support / WhatsApp:</span> 
+                   <span className="font-mono text-indigo-700 font-bold bg-indigo-50 px-2 rounded">0335 9523835</span>
+                </p>
+                <p className="mt-2 text-xs opacity-50">© 2024 EduCert Pro. All Rights Reserved.</p>
+             </div>
+          )}
         </div>
       )}
 
       {/* AUTHENTICATED VIEWS */}
       {view !== 'auth' && currentUser && (
         <>
-          {/* HEADER (Hidden when printing) */}
+          {/* HEADER */}
           <header className="bg-navy-900 text-white shadow-md no-print sticky top-0 z-50 border-b border-white/10">
             <div className="max-w-7xl mx-auto px-4 h-16 flex justify-between items-center">
               <div className="flex items-center gap-3">
@@ -534,12 +635,13 @@ function App() {
                 <div>
                   <h1 className="text-lg font-bold tracking-tight text-white leading-none">EduCert Pro</h1>
                   <span className="text-[10px] text-gold-400 font-medium uppercase tracking-wider">
-                     {currentUser.email}
+                     {currentUser.email} {currentUser.isAdmin ? '(Super Admin)' : ''}
                   </span>
                 </div>
               </div>
 
-              {view !== 'preview' && (
+              {/* Navigation */}
+              {view !== 'preview' && view !== 'pending_approval' && !currentUser.isAdmin && (
                 <nav className="flex items-center gap-2 bg-navy-800 p-1 rounded-lg">
                    <button 
                      onClick={() => setView('generator')}
@@ -552,6 +654,12 @@ function App() {
                      className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${view === 'settings' ? 'bg-gold-500 text-navy-900 shadow-sm' : 'text-slate-300 hover:text-white hover:bg-navy-700'}`}
                    >
                      <Settings size={16} /> Settings
+                   </button>
+                   <button 
+                     onClick={() => setView('license')}
+                     className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${view === 'license' ? 'bg-gold-500 text-navy-900 shadow-sm' : 'text-slate-300 hover:text-white hover:bg-navy-700'}`}
+                   >
+                     <CreditCard size={16} /> License
                    </button>
                 </nav>
               )}
@@ -573,6 +681,115 @@ function App() {
           {/* MAIN CONTENT */}
           <main className="flex-1 container mx-auto p-4 md:p-6">
             
+            {/* SUPER ADMIN PORTAL */}
+            {view === 'super_admin' && (
+                <SuperAdminPortal currentUser={currentUser} />
+            )}
+
+            {/* PENDING APPROVAL VIEW */}
+            {view === 'pending_approval' && (
+                <div className="max-w-md mx-auto mt-20 text-center animate-fade-in">
+                    <div className="bg-orange-50 p-8 rounded-2xl shadow-lg border border-orange-200">
+                        <div className="bg-orange-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <AlertTriangle className="text-orange-600" size={40}/>
+                        </div>
+                        <h2 className="text-2xl font-bold text-orange-800 mb-2">Account Pending Approval</h2>
+                        <p className="text-slate-600 mb-6">
+                            Thank you for registering. Your institute account is currently under review by the Administrator. 
+                        </p>
+                        <div className="bg-white p-4 rounded text-sm text-slate-500 border border-slate-200">
+                            Please contact Admin Support for faster approval:
+                            <br/>
+                            <strong className="text-navy-900 text-lg flex items-center justify-center gap-2 mt-1">
+                                <Phone size={16}/> 0335 9523835
+                            </strong>
+                        </div>
+                        <button onClick={handleLogout} className="mt-6 text-orange-700 font-bold hover:underline">Log Out</button>
+                    </div>
+                </div>
+            )}
+
+            {/* LICENSE & PAYMENT VIEW */}
+            {view === 'license' && (
+               <div className="max-w-5xl mx-auto animate-fade-in grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {/* Status Card */}
+                  <div className="bg-white p-8 rounded-xl shadow-lg border border-slate-200">
+                     <h2 className="text-2xl font-bold text-navy-900 mb-6 flex items-center gap-2"><CreditCard /> License Status</h2>
+                     
+                     <div className={`p-6 rounded-lg mb-6 text-center ${currentUser.license.status === 'active' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+                        <div className="text-sm uppercase tracking-widest font-bold mb-1 opacity-70">Current Plan</div>
+                        <div className={`text-3xl font-bold ${currentUser.license.status === 'active' ? 'text-green-700' : 'text-red-600'}`}>
+                           {currentUser.license.status === 'active' ? 'PRO LIFETIME' : 'EXPIRED / TRIAL'}
+                        </div>
+                        <div className="mt-4 text-sm text-slate-600">
+                           Expiry: <strong>{new Date(currentUser.license.expiryDate).toLocaleDateString()}</strong>
+                        </div>
+                        <div className="mt-1 text-xs text-slate-400 font-mono">Device ID: {currentUser.license.deviceId}</div>
+                     </div>
+
+                     <div className="border-t pt-6">
+                        <h3 className="font-bold text-lg mb-4">Activate License</h3>
+                        <form onSubmit={handleActivateKey} className="flex gap-2">
+                           <input 
+                              type="text" 
+                              value={activationKey} 
+                              onChange={e => setActivationKey(e.target.value.toUpperCase())}
+                              className="flex-1 border border-slate-300 rounded-lg p-3 uppercase font-mono tracking-wider" 
+                              placeholder="EDC-XXXX-YYYY-ZZZZ" 
+                           />
+                           <button type="submit" className="bg-navy-900 text-white px-4 rounded-lg font-bold">Activate</button>
+                        </form>
+                        {licenseMsg.text && (
+                           <p className={`text-sm mt-2 ${licenseMsg.type === 'success' ? 'text-green-600' : 'text-red-500'}`}>{licenseMsg.text}</p>
+                        )}
+                     </div>
+                  </div>
+
+                  {/* Payment Request */}
+                  <div className="bg-white p-8 rounded-xl shadow-lg border border-slate-200">
+                     <h2 className="text-2xl font-bold text-navy-900 mb-4">Buy License</h2>
+                     <p className="text-sm text-slate-500 mb-6">Transfer <strong>PKR 5,000</strong> to the account below and submit proof.</p>
+                     
+                     <div className="bg-slate-50 p-4 rounded mb-6 border border-slate-200 transition-all">
+                        <div className="flex justify-between mb-2">
+                           <span className="text-slate-500 text-sm">Account Title</span>
+                           <span className="font-bold text-navy-900">{payDetails.title}</span>
+                        </div>
+                        <div className="flex justify-between mb-2">
+                           <span className="text-slate-500 text-sm capitalize">{paymentForm.method} Number</span>
+                           <span className="font-bold text-navy-900 font-mono text-lg">{payDetails.number}</span>
+                        </div>
+                        
+                        <div className="text-xs text-center text-slate-400 mt-2 bg-white p-1 rounded border border-slate-100">
+                            Send payment to this mobile number
+                        </div>
+                     </div>
+
+                     <form onSubmit={handleSubmitPayment} className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                           <div>
+                              <label className="text-xs font-bold text-slate-500 mb-1 block">Payment Method</label>
+                              <select value={paymentForm.method} onChange={e => setPaymentForm({...paymentForm, method: e.target.value})} className="w-full border p-2 rounded bg-white text-slate-900">
+                                <option value="easypaisa">Easypaisa</option>
+                                <option value="sadapay">SadaPay</option>
+                                <option value="nayapay">NayaPay</option>
+                              </select>
+                           </div>
+                           <div>
+                              <label className="text-xs font-bold text-slate-500 mb-1 block">Transaction ID</label>
+                              <input required value={paymentForm.tid} onChange={e => setPaymentForm({...paymentForm, tid: e.target.value})} className="w-full border p-2 rounded" />
+                           </div>
+                        </div>
+                        <div>
+                             <label className="text-xs font-bold text-slate-500 mb-1 block">Sender Name</label>
+                             <input required value={paymentForm.sender} onChange={e => setPaymentForm({...paymentForm, sender: e.target.value})} className="w-full border p-2 rounded" />
+                        </div>
+                        <button type="submit" className="w-full bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700">Submit Payment Proof</button>
+                     </form>
+                  </div>
+               </div>
+            )}
+
             {/* GENERATOR FORM */}
             {view === 'generator' && (
               <div className="max-w-5xl mx-auto animate-fade-in">
@@ -603,7 +820,6 @@ function App() {
                     </div>
                     
                     <form onSubmit={handleGenerateCertificate} className="p-8 grid grid-cols-1 md:grid-cols-2 gap-8 text-slate-900">
-                       
                        {/* Section 1 */}
                        <div className="md:col-span-2">
                           <h3 className="text-sm uppercase tracking-wider font-bold text-indigo-600 mb-4 flex items-center gap-2">
@@ -753,7 +969,7 @@ function App() {
             )}
 
             {/* SETTINGS VIEW */}
-            {view === 'settings' && currentUser && (
+            {view === 'settings' && currentUser && !currentUser.isAdmin && (
               <AdminDashboard 
                 data={appData} 
                 currentUser={currentUser}

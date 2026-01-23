@@ -1,3 +1,4 @@
+
 export interface InstituteDetails {
   name: string;
   address: string;
@@ -41,11 +42,42 @@ export interface StudentCertificateData {
   issueDate: string;
 }
 
+export interface LicenseInfo {
+  status: 'trial' | 'active' | 'expired';
+  plan: 'free' | 'pro' | 'enterprise';
+  expiryDate: string; // ISO Date
+  deviceId: string;
+  activationKey?: string;
+}
+
+export interface PaymentRequest {
+  id: string;
+  userEmail: string;
+  method: 'easypaisa' | 'sadapay' | 'nayapay';
+  senderName: string;
+  transactionId: string;
+  amount: string;
+  status: 'pending' | 'approved' | 'rejected';
+  date: string;
+}
+
+export interface ActivationKey {
+  key: string;
+  generatedDate: string;
+  isUsed: boolean;
+  usedBy?: string;
+  durationDays: number;
+}
+
 export interface UserProfile {
   email: string;
   password: string;
   securityQuestion: string;
   securityAnswer: string;
+  isAdmin?: boolean;       // Super Admin Flag
+  isApproved: boolean;     // Approval Flag
+  isBlocked?: boolean;
+  license: LicenseInfo;
 }
 
 export interface AppData {
