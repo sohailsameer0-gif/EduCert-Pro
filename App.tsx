@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { Shield, Download, ArrowLeft, RefreshCw, FileCheck, Lock, User, Settings, LogOut, LayoutDashboard, Loader2, Maximize2, Mail, KeyRound, HelpCircle, Send, X, Bell, CreditCard, CheckCircle, AlertTriangle, Phone } from 'lucide-react';
+import { Shield, Download, ArrowLeft, RefreshCw, FileCheck, Lock, User, Settings, LogOut, LayoutDashboard, Loader2, Maximize2, Mail, KeyRound, HelpCircle, Send, X, Bell, CreditCard, CheckCircle, AlertTriangle, Phone, UploadCloud, Image as ImageIcon, Clock } from 'lucide-react';
 import { AppData, StudentCertificateData, UserProfile, LicenseInfo } from './types';
-import { getAppData, findUser, saveUser, updateUserPassword, updateUserLicense, addPayment, validateAndUseKey } from './utils/storage';
+import { getAppData, findUser, saveUser, updateUserPassword, updateUserLicense, addPayment, validateAndUseKey, getPayments, fileToBase64 } from './utils/storage';
 import { SECURITY_QUESTIONS } from './constants';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
@@ -51,7 +51,9 @@ function App() {
   // License & Payment State
   const [activationKey, setActivationKey] = useState('');
   const [paymentForm, setPaymentForm] = useState({ method: 'easypaisa', sender: '', tid: '', amount: '5000' });
+  const [paymentFile, setPaymentFile] = useState<File | null>(null);
   const [licenseMsg, setLicenseMsg] = useState({ type: '', text: '' });
+  const [userPaymentStatus, setUserPaymentStatus] = useState<string | null>(null);
 
   const [authMsg, setAuthMsg] = useState({ type: '', text: '' });
 
@@ -76,6 +78,21 @@ function App() {
     const data = getAppData();
     setAppData(data);
   }, []);
+
+  // Check for existing payments when user loads license view
+  useEffect(() => {
+    if (currentUser && view === 'license') {
+        const payments = getPayments();
+        // Find most recent payment
+        const myPayment = payments
+            .filter(p => p.userEmail === currentUser.email)
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+        
+        if (myPayment) {
+            setUserPaymentStatus(myPayment.status);
+        }
+    }
+  }, [currentUser, view]);
 
   // Clear mock email after 10 seconds if not closed
   useEffect(() => {
@@ -279,23 +296,55 @@ function App() {
     }
   };
 
-  const handleSubmitPayment = (e: React.FormEvent) => {
+  const handleSubmitPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) return;
 
-    addPayment({
-        id: crypto.randomUUID(),
-        userEmail: currentUser.email,
-        method: paymentForm.method as any,
-        senderName: paymentForm.sender,
-        transactionId: paymentForm.tid,
-        amount: paymentForm.amount,
-        status: 'pending',
-        date: new Date().toISOString()
-    });
+    // VALIDATION 1: TID Length
+    if (paymentForm.tid.length < 8) {
+        setLicenseMsg({ type: 'error', text: 'Invalid Transaction ID (Too Short)' });
+        return;
+    }
 
-    setLicenseMsg({ type: 'success', text: 'Payment proof submitted! Admin will review shortly.' });
-    setPaymentForm({ ...paymentForm, sender: '', tid: '' });
+    // VALIDATION 2: Mandatory Image
+    if (!paymentFile) {
+        setLicenseMsg({ type: 'error', text: 'Payment screenshot is MANDATORY.' });
+        return;
+    }
+
+    // VALIDATION 3: Image Size (Max 500KB to save localStorage)
+    if (paymentFile.size > 500 * 1024) {
+        setLicenseMsg({ type: 'error', text: 'Image too large. Max 500KB allowed.' });
+        return;
+    }
+
+    try {
+        const base64Image = await fileToBase64(paymentFile);
+
+        const result = addPayment({
+            id: crypto.randomUUID(),
+            userEmail: currentUser.email,
+            method: paymentForm.method as any,
+            senderName: paymentForm.sender,
+            transactionId: paymentForm.tid,
+            amount: paymentForm.amount,
+            proofImage: base64Image,
+            status: 'pending',
+            date: new Date().toISOString()
+        });
+
+        if (result.success) {
+            setLicenseMsg({ type: 'success', text: result.message });
+            setPaymentForm({ ...paymentForm, sender: '', tid: '' });
+            setPaymentFile(null);
+            setUserPaymentStatus('pending');
+        } else {
+            setLicenseMsg({ type: 'error', text: result.message });
+        }
+
+    } catch (error) {
+        setLicenseMsg({ type: 'error', text: 'Error processing image.' });
+    }
   };
 
   const handleLogout = () => {
@@ -468,7 +517,7 @@ function App() {
               </div>
             )}
 
-            {/* SIGNUP FORM */}
+            {/* SIGNUP FORM & OTP, FORGOT... (No Changes needed here, omitted for brevity but part of file) */}
             {authMode === 'signup' && (
               <div className="animate-fade-in">
                 <h2 className="text-xl font-bold text-slate-800 mb-6 border-b pb-2 flex items-center gap-2">
@@ -514,7 +563,7 @@ function App() {
                 </form>
               </div>
             )}
-
+            
             {/* OTP VERIFICATION FORM */}
             {authMode === 'otp' && (
                <div className="animate-fade-in">
@@ -606,6 +655,7 @@ function App() {
                 )}
               </div>
             )}
+            {/* End Auth Forms */}
 
           </div>
           
@@ -719,7 +769,7 @@ function App() {
                      <div className={`p-6 rounded-lg mb-6 text-center ${currentUser.license.status === 'active' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                         <div className="text-sm uppercase tracking-widest font-bold mb-1 opacity-70">Current Plan</div>
                         <div className={`text-3xl font-bold ${currentUser.license.status === 'active' ? 'text-green-700' : 'text-red-600'}`}>
-                           {currentUser.license.status === 'active' ? 'PRO LIFETIME' : 'EXPIRED / TRIAL'}
+                           {currentUser.license.status === 'active' ? 'PRO PLAN (1 YEAR)' : 'EXPIRED / TRIAL (3 DAYS)'}
                         </div>
                         <div className="mt-4 text-sm text-slate-600">
                            Expiry: <strong>{new Date(currentUser.license.expiryDate).toLocaleDateString()}</strong>
@@ -748,51 +798,106 @@ function App() {
                   {/* Payment Request */}
                   <div className="bg-white p-8 rounded-xl shadow-lg border border-slate-200">
                      <h2 className="text-2xl font-bold text-navy-900 mb-4">Buy License</h2>
-                     <p className="text-sm text-slate-500 mb-6">Transfer <strong>PKR 5,000</strong> to the account below and submit proof.</p>
                      
-                     <div className="bg-slate-50 p-4 rounded mb-6 border border-slate-200 transition-all">
-                        <div className="flex justify-between mb-2">
-                           <span className="text-slate-500 text-sm">Account Title</span>
-                           <span className="font-bold text-navy-900">{payDetails.title}</span>
-                        </div>
-                        <div className="flex justify-between mb-2">
-                           <span className="text-slate-500 text-sm capitalize">{paymentForm.method} Number</span>
-                           <span className="font-bold text-navy-900 font-mono text-lg">{payDetails.number}</span>
-                        </div>
-                        
-                        <div className="text-xs text-center text-slate-400 mt-2 bg-white p-1 rounded border border-slate-100">
-                            Send payment to this mobile number
-                        </div>
-                     </div>
+                     {userPaymentStatus === 'pending' ? (
+                         <div className="bg-gold-50 border border-gold-200 rounded-lg p-6 text-center">
+                             <div className="w-16 h-16 bg-gold-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                 <Clock size={32} className="text-gold-600" />
+                             </div>
+                             <h3 className="text-xl font-bold text-gold-800 mb-2">Request Pending</h3>
+                             <p className="text-slate-600 text-sm">
+                                 Your payment proof is under review by the administrator. <br/>
+                                 Please wait up to 24 hours.
+                             </p>
+                             <div className="mt-4 p-3 bg-white border border-gold-200 rounded text-xs text-slate-500">
+                                Contact support if urgent: <strong>0335 9523835</strong>
+                             </div>
+                         </div>
+                     ) : (
+                         <>
+                             <p className="text-sm text-slate-500 mb-6">Transfer <strong>PKR 5,000</strong> to the account below and submit proof.</p>
+                             
+                             <div className="bg-slate-50 p-4 rounded mb-6 border border-slate-200 transition-all">
+                                <div className="flex justify-between mb-2">
+                                   <span className="text-slate-500 text-sm">Account Title</span>
+                                   <span className="font-bold text-navy-900">{payDetails.title}</span>
+                                </div>
+                                <div className="flex justify-between mb-2">
+                                   <span className="text-slate-500 text-sm capitalize">{paymentForm.method} Number</span>
+                                   <span className="font-bold text-navy-900 font-mono text-lg">{payDetails.number}</span>
+                                </div>
+                                
+                                <div className="text-xs text-center text-slate-400 mt-2 bg-white p-1 rounded border border-slate-100">
+                                    Send payment to this mobile number
+                                </div>
+                             </div>
 
-                     <form onSubmit={handleSubmitPayment} className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                           <div>
-                              <label className="text-xs font-bold text-slate-500 mb-1 block">Payment Method</label>
-                              <select value={paymentForm.method} onChange={e => setPaymentForm({...paymentForm, method: e.target.value})} className="w-full border p-2 rounded bg-white text-slate-900">
-                                <option value="easypaisa">Easypaisa</option>
-                                <option value="sadapay">SadaPay</option>
-                                <option value="nayapay">NayaPay</option>
-                              </select>
-                           </div>
-                           <div>
-                              <label className="text-xs font-bold text-slate-500 mb-1 block">Transaction ID</label>
-                              <input required value={paymentForm.tid} onChange={e => setPaymentForm({...paymentForm, tid: e.target.value})} className="w-full border p-2 rounded" />
-                           </div>
-                        </div>
-                        <div>
-                             <label className="text-xs font-bold text-slate-500 mb-1 block">Sender Name</label>
-                             <input required value={paymentForm.sender} onChange={e => setPaymentForm({...paymentForm, sender: e.target.value})} className="w-full border p-2 rounded" />
-                        </div>
-                        <button type="submit" className="w-full bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700">Submit Payment Proof</button>
-                     </form>
+                             <form onSubmit={handleSubmitPayment} className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                   <div>
+                                      <label className="text-xs font-bold text-slate-500 mb-1 block">Payment Method</label>
+                                      <select value={paymentForm.method} onChange={e => setPaymentForm({...paymentForm, method: e.target.value})} className="w-full border p-2 rounded bg-white text-slate-900">
+                                        <option value="easypaisa">Easypaisa</option>
+                                        <option value="sadapay">SadaPay</option>
+                                        <option value="nayapay">NayaPay</option>
+                                      </select>
+                                   </div>
+                                   <div>
+                                      <label className="text-xs font-bold text-slate-500 mb-1 block">Transaction ID (TID)</label>
+                                      <input 
+                                        required 
+                                        value={paymentForm.tid} 
+                                        onChange={e => setPaymentForm({...paymentForm, tid: e.target.value})} 
+                                        className="w-full border p-2 rounded" 
+                                        placeholder="e.g. 12345678901"
+                                      />
+                                   </div>
+                                </div>
+                                <div>
+                                     <label className="text-xs font-bold text-slate-500 mb-1 block">Sender Name</label>
+                                     <input required value={paymentForm.sender} onChange={e => setPaymentForm({...paymentForm, sender: e.target.value})} className="w-full border p-2 rounded" />
+                                </div>
+                                
+                                {/* Image Upload */}
+                                <div>
+                                     <label className="text-xs font-bold text-slate-500 mb-1 block">Screenshot Proof (Required)</label>
+                                     <div className="relative border-2 border-dashed border-slate-300 rounded-lg p-4 hover:bg-slate-50 transition text-center cursor-pointer">
+                                         <input 
+                                            type="file" 
+                                            accept="image/*" 
+                                            required
+                                            onChange={(e) => setPaymentFile(e.target.files ? e.target.files[0] : null)}
+                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                         />
+                                         <div className="flex flex-col items-center gap-2 pointer-events-none">
+                                            {paymentFile ? (
+                                                <>
+                                                    <ImageIcon className="text-green-500" size={24} />
+                                                    <span className="text-sm font-bold text-green-700">{paymentFile.name}</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <UploadCloud className="text-slate-400" size={24} />
+                                                    <span className="text-xs text-slate-500">Click to upload screenshot</span>
+                                                </>
+                                            )}
+                                         </div>
+                                     </div>
+                                </div>
+
+                                <button type="submit" className="w-full bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700 shadow-sm flex items-center justify-center gap-2">
+                                    <Send size={16} /> Submit Payment Proof
+                                </button>
+                             </form>
+                         </>
+                     )}
                   </div>
                </div>
             )}
-
-            {/* GENERATOR FORM */}
-            {view === 'generator' && (
-              <div className="max-w-5xl mx-auto animate-fade-in">
+            
+            {/* GENERATOR, SETTINGS, PREVIEW omitted for brevity (no changes there) */}
+            {view === 'generator' && (/*...existing code...*/ 
+                <div className="max-w-5xl mx-auto animate-fade-in">
                  <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-lg overflow-hidden border border-slate-200">
                     <div className="bg-slate-50 p-6 border-b border-slate-200 flex justify-between items-center text-slate-900">
                        <div>
@@ -967,8 +1072,7 @@ function App() {
                  </div>
               </div>
             )}
-
-            {/* SETTINGS VIEW */}
+            
             {view === 'settings' && currentUser && !currentUser.isAdmin && (
               <AdminDashboard 
                 data={appData} 
@@ -980,7 +1084,6 @@ function App() {
               />
             )}
 
-            {/* PREVIEW VIEW */}
             {view === 'preview' && (
               <div className="flex flex-col items-center gap-8 animate-fade-in pb-10">
                  <div className="w-full flex justify-between items-center max-w-[1123px] no-print bg-white p-4 rounded-lg shadow-sm border border-slate-200">
@@ -1015,7 +1118,7 @@ function App() {
                  </div>
               </div>
             )}
-
+            {/* ... other views ... */}
           </main>
         </>
       )}

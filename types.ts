@@ -57,6 +57,7 @@ export interface PaymentRequest {
   senderName: string;
   transactionId: string;
   amount: string;
+  proofImage: string | null; // Base64 Screenshot
   status: 'pending' | 'approved' | 'rejected';
   date: string;
 }

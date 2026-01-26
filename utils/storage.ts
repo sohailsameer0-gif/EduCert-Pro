@@ -82,11 +82,11 @@ export const saveUser = (user: UserProfile): boolean => {
     return false; // User exists
   }
   
-  // Assign Default Trial License
+  // Assign Default Trial License (Changed to 3 Days)
   const trialLicense: LicenseInfo = {
     status: 'trial',
     plan: 'free',
-    expiryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 Days
+    expiryDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(), // 3 Days
     deviceId: getDeviceId()
   };
 
@@ -134,14 +134,12 @@ export const updateUserStatus = (email: string, isApproved: boolean, isBlocked: 
 
 export const deleteUser = (email: string): void => {
   try {
-    // Read raw storage to avoid any side effects from getUsers()
     const stored = localStorage.getItem(USERS_KEY);
     if (!stored) return;
     
     let users: UserProfile[] = JSON.parse(stored);
     const initialLength = users.length;
     
-    // Filter out the user
     users = users.filter(u => u.email !== email);
     
     if (users.length !== initialLength) {
@@ -152,16 +150,48 @@ export const deleteUser = (email: string): void => {
   }
 };
 
+export const deleteUsers = (emails: string[]): void => {
+  try {
+    const stored = localStorage.getItem(USERS_KEY);
+    if (!stored) return;
+    
+    let users: UserProfile[] = JSON.parse(stored);
+    
+    // Filter keeps users who are NOT in the emails array
+    const newUsers = users.filter(u => !emails.includes(u.email));
+    
+    localStorage.setItem(USERS_KEY, JSON.stringify(newUsers));
+  } catch (e) {
+    console.error("Error deleting users:", e);
+  }
+};
+
 // Payment Management
 export const getPayments = (): PaymentRequest[] => {
     const stored = localStorage.getItem(PAYMENTS_KEY);
     return stored ? JSON.parse(stored) : [];
 };
 
-export const addPayment = (payment: PaymentRequest) => {
+export const addPayment = (payment: PaymentRequest): { success: boolean, message: string } => {
     const payments = getPayments();
-    payments.push(payment);
-    localStorage.setItem(PAYMENTS_KEY, JSON.stringify(payments));
+    
+    const existingPending = payments.find(p => p.userEmail === payment.userEmail && p.status === 'pending');
+    if (existingPending) {
+        return { success: false, message: "You already have a pending request. Please wait for admin approval." };
+    }
+
+    const duplicateTID = payments.find(p => p.transactionId.toLowerCase() === payment.transactionId.toLowerCase());
+    if (duplicateTID) {
+        return { success: false, message: "This Transaction ID has already been used." };
+    }
+
+    try {
+        payments.push(payment);
+        localStorage.setItem(PAYMENTS_KEY, JSON.stringify(payments));
+        return { success: true, message: "Payment proof submitted successfully!" };
+    } catch (e) {
+        return { success: false, message: "Storage full. Please use a smaller screenshot image." };
+    }
 };
 
 export const updatePaymentStatus = (id: string, status: 'approved' | 'rejected') => {
@@ -170,6 +200,20 @@ export const updatePaymentStatus = (id: string, status: 'approved' | 'rejected')
     if (idx !== -1) {
         payments[idx].status = status;
         localStorage.setItem(PAYMENTS_KEY, JSON.stringify(payments));
+    }
+};
+
+export const deletePayments = (ids: string[]): void => {
+    try {
+        const stored = localStorage.getItem(PAYMENTS_KEY);
+        if (!stored) return;
+        
+        let payments: PaymentRequest[] = JSON.parse(stored);
+        const newPayments = payments.filter(p => !ids.includes(p.id));
+        
+        localStorage.setItem(PAYMENTS_KEY, JSON.stringify(newPayments));
+    } catch (e) {
+        console.error("Error deleting payments:", e);
     }
 };
 
@@ -214,4 +258,18 @@ export const deleteKey = (keyString: string): void => {
     let keys = getKeys();
     keys = keys.filter(k => k.key !== keyString);
     localStorage.setItem(KEYS_KEY, JSON.stringify(keys));
+};
+
+export const deleteKeys = (keyStrings: string[]): void => {
+    try {
+        const stored = localStorage.getItem(KEYS_KEY);
+        if (!stored) return;
+        
+        let keys: ActivationKey[] = JSON.parse(stored);
+        const newKeys = keys.filter(k => !keyStrings.includes(k.key));
+        
+        localStorage.setItem(KEYS_KEY, JSON.stringify(newKeys));
+    } catch (e) {
+        console.error("Error deleting keys:", e);
+    }
 };
