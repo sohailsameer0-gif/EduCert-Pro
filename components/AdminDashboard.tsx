@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { AppData, UserProfile } from '../types';
 import { fileToBase64, saveAppData, updateUserPassword } from '../utils/storage';
@@ -82,50 +83,59 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, currentUser, onUp
   const inputClass = "w-full border border-slate-300 rounded-lg p-3 bg-white text-slate-900 focus:ring-2 focus:ring-indigo-500 outline-none transition-all";
 
   return (
-    <div className="bg-white/95 text-slate-900 shadow-lg rounded-xl overflow-hidden flex flex-col md:flex-row border border-slate-200 h-[calc(100vh-140px)] animate-fade-in backdrop-blur-sm">
+    <div className="bg-white/95 text-slate-900 shadow-lg rounded-xl overflow-hidden flex flex-col md:flex-row border border-slate-200 h-full md:h-[calc(100vh-140px)] animate-fade-in backdrop-blur-sm">
       
-      {/* Sidebar */}
-      <div className="w-full md:w-64 bg-slate-50 border-r border-slate-200 p-4 flex flex-col gap-2 overflow-y-auto">
-        <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider px-4 py-2 mb-2">Configuration</h2>
+      {/* Sidebar (Desktop) / Horizontal Scroll (Mobile) */}
+      <div className="w-full md:w-64 bg-slate-50 border-b md:border-b-0 md:border-r border-slate-200 p-2 md:p-4 flex flex-row md:flex-col gap-2 overflow-x-auto md:overflow-y-auto scrollbar-hide flex-shrink-0">
+        <h2 className="hidden md:block text-xs font-bold text-slate-400 uppercase tracking-wider px-4 py-2 mb-2">Configuration</h2>
         
-        <button onClick={() => setActiveTab('general')} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all font-medium text-sm ${activeTab === 'general' ? 'bg-indigo-600 text-white shadow-md' : 'hover:bg-white hover:shadow text-slate-600'}`}>
-          <Settings size={18} /> General Settings
+        <button onClick={() => setActiveTab('general')} className={`flex-shrink-0 flex items-center gap-2 md:gap-3 px-3 md:px-4 py-2 md:py-3 rounded-lg transition-all font-medium text-xs md:text-sm whitespace-nowrap ${activeTab === 'general' ? 'bg-indigo-600 text-white shadow-md' : 'hover:bg-white hover:shadow text-slate-600'}`}>
+          <Settings size={18} /> <span className="md:inline">General</span>
         </button>
-        <button onClick={() => setActiveTab('account')} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all font-medium text-sm ${activeTab === 'account' ? 'bg-indigo-600 text-white shadow-md' : 'hover:bg-white hover:shadow text-slate-600'}`}>
-          <User size={18} /> My Account
+        <button onClick={() => setActiveTab('account')} className={`flex-shrink-0 flex items-center gap-2 md:gap-3 px-3 md:px-4 py-2 md:py-3 rounded-lg transition-all font-medium text-xs md:text-sm whitespace-nowrap ${activeTab === 'account' ? 'bg-indigo-600 text-white shadow-md' : 'hover:bg-white hover:shadow text-slate-600'}`}>
+          <User size={18} /> <span className="md:inline">My Account</span>
         </button>
-        <button onClick={() => setActiveTab('appearance')} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all font-medium text-sm ${activeTab === 'appearance' ? 'bg-indigo-600 text-white shadow-md' : 'hover:bg-white hover:shadow text-slate-600'}`}>
-          <Palette size={18} /> Appearance
+        <button onClick={() => setActiveTab('appearance')} className={`flex-shrink-0 flex items-center gap-2 md:gap-3 px-3 md:px-4 py-2 md:py-3 rounded-lg transition-all font-medium text-xs md:text-sm whitespace-nowrap ${activeTab === 'appearance' ? 'bg-indigo-600 text-white shadow-md' : 'hover:bg-white hover:shadow text-slate-600'}`}>
+          <Palette size={18} /> <span className="md:inline">Appearance</span>
         </button>
-        <button onClick={() => setActiveTab('templates')} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all font-medium text-sm ${activeTab === 'templates' ? 'bg-indigo-600 text-white shadow-md' : 'hover:bg-white hover:shadow text-slate-600'}`}>
-          <LayoutTemplate size={18} /> Templates
+        <button onClick={() => setActiveTab('templates')} className={`flex-shrink-0 flex items-center gap-2 md:gap-3 px-3 md:px-4 py-2 md:py-3 rounded-lg transition-all font-medium text-xs md:text-sm whitespace-nowrap ${activeTab === 'templates' ? 'bg-indigo-600 text-white shadow-md' : 'hover:bg-white hover:shadow text-slate-600'}`}>
+          <LayoutTemplate size={18} /> <span className="md:inline">Templates</span>
         </button>
-        <div className="h-px bg-slate-200 my-2"></div>
-        <button onClick={() => setActiveTab('courses')} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all font-medium text-sm ${activeTab === 'courses' ? 'bg-indigo-600 text-white shadow-md' : 'hover:bg-white hover:shadow text-slate-600'}`}>
-          <BookOpen size={18} /> Courses
+        <div className="hidden md:block h-px bg-slate-200 my-2"></div>
+        <button onClick={() => setActiveTab('courses')} className={`flex-shrink-0 flex items-center gap-2 md:gap-3 px-3 md:px-4 py-2 md:py-3 rounded-lg transition-all font-medium text-xs md:text-sm whitespace-nowrap ${activeTab === 'courses' ? 'bg-indigo-600 text-white shadow-md' : 'hover:bg-white hover:shadow text-slate-600'}`}>
+          <BookOpen size={18} /> <span className="md:inline">Courses</span>
         </button>
-        <button onClick={() => setActiveTab('durations')} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all font-medium text-sm ${activeTab === 'durations' ? 'bg-indigo-600 text-white shadow-md' : 'hover:bg-white hover:shadow text-slate-600'}`}>
-          <Clock size={18} /> Durations
+        <button onClick={() => setActiveTab('durations')} className={`flex-shrink-0 flex items-center gap-2 md:gap-3 px-3 md:px-4 py-2 md:py-3 rounded-lg transition-all font-medium text-xs md:text-sm whitespace-nowrap ${activeTab === 'durations' ? 'bg-indigo-600 text-white shadow-md' : 'hover:bg-white hover:shadow text-slate-600'}`}>
+          <Clock size={18} /> <span className="md:inline">Durations</span>
         </button>
-        <button onClick={() => setActiveTab('types')} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all font-medium text-sm ${activeTab === 'types' ? 'bg-indigo-600 text-white shadow-md' : 'hover:bg-white hover:shadow text-slate-600'}`}>
-          <FileBadge size={18} /> Cert Types
+        <button onClick={() => setActiveTab('types')} className={`flex-shrink-0 flex items-center gap-2 md:gap-3 px-3 md:px-4 py-2 md:py-3 rounded-lg transition-all font-medium text-xs md:text-sm whitespace-nowrap ${activeTab === 'types' ? 'bg-indigo-600 text-white shadow-md' : 'hover:bg-white hover:shadow text-slate-600'}`}>
+          <FileBadge size={18} /> <span className="md:inline">Cert Types</span>
         </button>
 
-        <div className="mt-auto pt-4 border-t border-slate-200">
+        <div className="md:mt-auto pt-0 md:pt-4 md:border-t border-slate-200 hidden md:block">
            <button onClick={handleSave} className="w-full mb-2 bg-green-600 hover:bg-green-700 text-white py-3 px-4 rounded-lg flex items-center justify-center gap-2 font-semibold shadow-sm transition-colors" disabled={isSaving}>
             <Save size={18} /> {isSaving ? 'Saving...' : 'Save Changes'}
           </button>
         </div>
       </div>
 
+      {/* Mobile Save Button (Fixed at bottom right) */}
+      <button 
+        onClick={handleSave} 
+        disabled={isSaving}
+        className="md:hidden fixed bottom-6 right-6 z-50 bg-green-600 hover:bg-green-700 text-white p-4 rounded-full shadow-2xl flex items-center justify-center transition-all active:scale-95"
+      >
+        <Save size={24} />
+      </button>
+
       {/* Content Area */}
-      <div className="flex-1 p-6 md:p-8 overflow-y-auto">
+      <div className="flex-1 p-4 md:p-8 overflow-y-auto">
         
         {/* GENERAL SETTINGS */}
         {activeTab === 'general' && (
-          <div className="space-y-6 max-w-3xl">
-            <h3 className="text-2xl font-bold text-slate-800 border-b pb-4 mb-4">Institute Details</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-6 max-w-3xl animate-fade-in">
+            <h3 className="text-xl md:text-2xl font-bold text-slate-800 border-b pb-4 mb-4">Institute Details</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
               <div className="space-y-2">
                 <label className="block text-sm font-semibold text-slate-700">Institute Name</label>
                 <input type="text" value={tempData.institute.name} onChange={e => setTempData({...tempData, institute: {...tempData.institute, name: e.target.value}})} className={inputClass} />
@@ -148,18 +158,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, currentUser, onUp
               </div>
             </div>
 
-            <h3 className="text-xl font-bold text-slate-800 border-b pb-4 mt-10 mb-4">Branding Assets</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <h3 className="text-xl font-bold text-slate-800 border-b pb-4 mt-8 md:mt-10 mb-4">Branding Assets</h3>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
                {['logo', 'seal', 'badge', 'signature'].map((key) => (
-                 <div key={key} className="border-2 border-dashed border-slate-300 rounded-xl p-6 flex flex-col items-center text-center hover:bg-slate-50 transition-colors">
-                   <div className="h-24 w-24 bg-white border border-slate-200 rounded-lg mb-4 flex items-center justify-center overflow-hidden shadow-sm">
+                 <div key={key} className="border-2 border-dashed border-slate-300 rounded-xl p-4 flex flex-col items-center text-center hover:bg-slate-50 transition-colors">
+                   <div className="h-20 w-20 md:h-24 md:w-24 bg-white border border-slate-200 rounded-lg mb-4 flex items-center justify-center overflow-hidden shadow-sm">
                      {tempData.institute[key as keyof typeof tempData.institute] ? (
                        <img src={tempData.institute[key as keyof typeof tempData.institute] as string} className="h-full w-full object-contain" alt={key}/>
                      ) : <span className="text-xs text-slate-400">No {key}</span>}
                    </div>
-                   <label className="cursor-pointer bg-slate-900 text-white text-xs font-bold py-2 px-4 rounded hover:bg-slate-800 transition capitalize">
+                   <label className="cursor-pointer bg-navy-900 text-white text-[10px] md:text-xs font-bold py-2 px-3 md:px-4 rounded hover:bg-navy-800 transition capitalize w-full">
                      <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, key as any)} />
-                     Upload {key}
+                     Upload
                    </label>
                  </div>
                ))}
@@ -169,16 +179,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, currentUser, onUp
 
         {/* ACCOUNT SETTINGS */}
         {activeTab === 'account' && (
-          <div className="space-y-6 max-w-xl">
-            <h3 className="text-2xl font-bold text-slate-800 border-b pb-4 mb-4">My Account</h3>
+          <div className="space-y-6 max-w-xl animate-fade-in">
+            <h3 className="text-xl md:text-2xl font-bold text-slate-800 border-b pb-4 mb-4">My Account</h3>
             
             <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-6 flex items-center gap-4">
                <div className="bg-indigo-100 p-3 rounded-full text-indigo-600">
                   <User size={24} />
                </div>
-               <div>
+               <div className="overflow-hidden">
                   <p className="text-xs text-slate-500 uppercase font-bold">Logged in as</p>
-                  <p className="text-lg font-bold text-slate-800">{currentUser.email}</p>
+                  <p className="text-lg font-bold text-slate-800 truncate">{currentUser.email}</p>
                </div>
             </div>
 
@@ -204,7 +214,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, currentUser, onUp
                  <input type="password" required minLength={4} value={passForm.confirm} onChange={e => setPassForm({...passForm, confirm: e.target.value})} className={inputClass} placeholder="Confirm new password" />
                </div>
 
-               <button type="submit" className="bg-navy-900 text-white px-6 py-3 rounded-lg font-bold hover:bg-navy-800 transition shadow-md flex items-center gap-2">
+               <button type="submit" className="w-full bg-navy-900 text-white px-6 py-3 rounded-lg font-bold hover:bg-navy-800 transition shadow-md flex items-center justify-center gap-2">
                   <KeyRound size={18} /> Update Password
                </button>
             </form>
@@ -213,10 +223,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, currentUser, onUp
 
         {/* APPEARANCE SETTINGS */}
         {activeTab === 'appearance' && (
-           <div className="space-y-8">
+           <div className="space-y-8 animate-fade-in">
               <div>
-                <h3 className="text-2xl font-bold text-slate-800 mb-2">App Theme</h3>
-                <p className="text-slate-500 mb-6">Select a theme that matches your institute's branding.</p>
+                <h3 className="text-xl md:text-2xl font-bold text-slate-800 mb-2">App Theme</h3>
+                <p className="text-slate-500 mb-6 text-sm">Select a theme that matches your institute's branding.</p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                    {/* Light Theme */}
                    <div 
@@ -275,9 +285,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, currentUser, onUp
 
         {/* TEMPLATES SETTINGS */}
         {activeTab === 'templates' && (
-          <div className="space-y-8">
+          <div className="space-y-8 animate-fade-in">
              <div>
-                <h3 className="text-2xl font-bold text-slate-800 mb-4">Select Template</h3>
+                <h3 className="text-xl md:text-2xl font-bold text-slate-800 mb-4">Select Template</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {[
                     { id: 'classic', name: 'Classic Academic', desc: 'Traditional bordered look with serif fonts.', color: 'bg-white' },
@@ -311,14 +321,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, currentUser, onUp
 
         {/* COURSES, DURATIONS, TYPES */}
         {(['courses', 'durations'] as const).map(tab => activeTab === tab && (
-          <div key={tab} className="space-y-6 max-w-2xl">
-            <h3 className="text-2xl font-bold text-slate-800 capitalize">Manage {tab}</h3>
+          <div key={tab} className="space-y-6 max-w-2xl animate-fade-in">
+            <h3 className="text-xl md:text-2xl font-bold text-slate-800 capitalize">Manage {tab}</h3>
             
             {/* Add New Box */}
-            <div className="bg-slate-50 p-4 rounded-xl flex gap-3 border border-slate-200">
+            <div className="bg-slate-50 p-4 rounded-xl flex gap-3 border border-slate-200 shadow-inner">
               <input type="text" id={`new${tab}`} placeholder={`Add new ${tab.slice(0, -1)}`} className={inputClass} 
                 onKeyDown={(e) => { if(e.key === 'Enter' && e.currentTarget.value) { addItem(tab, { id: crypto.randomUUID(), [tab === 'courses' ? 'name' : 'label']: e.currentTarget.value }); e.currentTarget.value = ''; }}} />
-              <button onClick={() => { const el = document.getElementById(`new${tab}`) as HTMLInputElement; if(el?.value) { addItem(tab, { id: crypto.randomUUID(), [tab === 'courses' ? 'name' : 'label']: el.value }); el.value = ''; }}} className="bg-indigo-600 text-white px-5 rounded-lg font-bold hover:bg-indigo-700 transition shadow-sm"><Plus /></button>
+              <button onClick={() => { const el = document.getElementById(`new${tab}`) as HTMLInputElement; if(el?.value) { addItem(tab, { id: crypto.randomUUID(), [tab === 'courses' ? 'name' : 'label']: el.value }); el.value = ''; }}} className="bg-indigo-600 text-white px-5 rounded-lg font-bold hover:bg-indigo-700 transition shadow-sm flex items-center"><Plus /></button>
             </div>
             
             {/* List Items */}
@@ -329,14 +339,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, currentUser, onUp
                   <button onClick={() => removeItem(tab, item.id)} className="text-slate-400 hover:text-red-500 p-2"><Trash2 size={18} /></button>
                 </div>
               ))}
+              {tempData[tab].length === 0 && <p className="text-center text-slate-400 text-sm">No items found.</p>}
             </div>
           </div>
         ))}
 
         {activeTab === 'types' && (
-          <div className="space-y-6 max-w-2xl">
-            <h3 className="text-2xl font-bold text-slate-800">Certificate Types</h3>
-             <button onClick={() => addItem('types', { id: crypto.randomUUID(), label: 'New Type', templateTitle: 'Certificate', description: 'This is to certify that {{student}}...' })} className="flex items-center gap-2 bg-indigo-600 text-white px-5 py-3 rounded-lg hover:bg-indigo-700 shadow-sm mb-4 transition font-bold">
+          <div className="space-y-6 max-w-2xl animate-fade-in">
+            <h3 className="text-xl md:text-2xl font-bold text-slate-800">Certificate Types</h3>
+             <button onClick={() => addItem('types', { id: crypto.randomUUID(), label: 'New Type', templateTitle: 'Certificate', description: 'This is to certify that {{student}}...' })} className="flex items-center gap-2 bg-indigo-600 text-white px-5 py-3 rounded-lg hover:bg-indigo-700 shadow-sm mb-4 transition font-bold w-full md:w-auto justify-center">
                 <Plus size={18}/> Add New Type
               </button>
             <div className="space-y-4">
@@ -357,7 +368,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, currentUser, onUp
                        <textarea value={t.description} onChange={(e) => updateItem('types', t.id, 'description', e.target.value)} className={`${inputClass} h-32`} />
                     </div>
                   </div>
-                   <button onClick={() => removeItem('types', t.id)} className="absolute top-2 right-2 text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity p-2"><Trash2 size={18} /></button>
+                   <button onClick={() => removeItem('types', t.id)} className="absolute top-2 right-2 text-red-400 hover:text-red-600 md:opacity-0 md:group-hover:opacity-100 transition-opacity p-2"><Trash2 size={18} /></button>
                 </div>
               ))}
             </div>

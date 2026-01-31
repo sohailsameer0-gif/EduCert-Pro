@@ -21,7 +21,7 @@ export const saveAppData = (data: AppData): void => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   } catch (error) {
     console.error("Failed to save data:", error);
-    alert("Storage full! Please try using smaller images.");
+    alert("Storage limit reached! Images are being compressed, but you may need to delete old data.");
   }
 };
 
@@ -40,7 +40,56 @@ export const fileToBase64 = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
-    reader.onload = () => resolve(reader.result as string);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+            resolve(event.target?.result as string);
+            return;
+        }
+
+        // Resize to reduce storage footprint significantly
+        // 500px is sufficient for certificates and payment proofs on screens/print
+        const MAX_DIMENSION = 500; 
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_DIMENSION) {
+            height *= MAX_DIMENSION / width;
+            width = MAX_DIMENSION;
+          }
+        } else {
+          if (height > MAX_DIMENSION) {
+            width *= MAX_DIMENSION / height;
+            height = MAX_DIMENSION;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // Smart Compression
+        if (file.type === 'image/png') {
+            // Keep PNG for transparency, but resized
+            resolve(canvas.toDataURL('image/png'));
+        } else {
+            // Compress JPEGs significantly (0.6 quality)
+            resolve(canvas.toDataURL('image/jpeg', 0.6));
+        }
+      };
+      
+      img.onerror = (err) => {
+         // Fallback to original if image load fails
+         console.warn("Image compression failed, using original", err);
+         resolve(event.target?.result as string);
+      };
+    };
     reader.onerror = (error) => reject(error);
   });
 };

@@ -1,10 +1,11 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="https://lucide.dev/logo.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#1e293b" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+    <meta name="theme-color" content="#0f172a" />
     <meta name="description" content="Professional Certificate Generator" />
     <title>EduCert Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -13,8 +14,9 @@
         theme: {
           extend: {
             fontFamily: {
-              serif: ['Times New Roman', 'serif'],
+              serif: ['"Playfair Display"', 'serif'],
               sans: ['Inter', 'sans-serif'],
+              signature: ['"Great Vibes"', 'cursive'],
             },
             colors: {
               navy: {
@@ -33,73 +35,59 @@
                 800: '#794014',
                 900: '#643615',
               }
+            },
+            animation: {
+              'fade-in': 'fadeIn 0.5s ease-out',
+              'slide-up': 'slideUp 0.5s ease-out',
+              'bounce-in': 'bounceIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+            },
+            keyframes: {
+              fadeIn: {
+                '0%': { opacity: '0' },
+                '100%': { opacity: '1' },
+              },
+              slideUp: {
+                '0%': { transform: 'translateY(20px)', opacity: '0' },
+                '100%': { transform: 'translateY(0)', opacity: '1' },
+              },
+              bounceIn: {
+                '0%': { transform: 'scale(0.8)', opacity: '0' },
+                '100%': { transform: 'scale(1)', opacity: '1' },
+              }
             }
           },
         },
       }
     </script>
     <style>
-      @import url('https://fonts.googleapis.com/css2?family=Great+Vibes&family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@400;700&display=swap');
+      @import url('https://fonts.googleapis.com/css2?family=Great+Vibes&family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@400;700&display=swap');
       
       body {
         font-family: 'Inter', sans-serif;
+        -webkit-tap-highlight-color: transparent;
       }
       
-      .font-signature {
-        font-family: 'Great Vibes', cursive;
+      /* Hide Scrollbar for cleaner UI in horizonal lists */
+      .scrollbar-hide::-webkit-scrollbar {
+          display: none;
       }
-      
-      .font-official {
-        font-family: 'Playfair Display', serif;
+      .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
       }
 
+      .font-signature { font-family: 'Great Vibes', cursive; }
+      .font-official { font-family: 'Playfair Display', serif; }
+
+      /* Mobile Print Fixes */
       @media print {
-        @page {
-          size: landscape;
-          margin: 0;
-        }
-        
-        body {
-          visibility: hidden;
-          background: white;
-          -webkit-print-color-adjust: exact !important;
-          print-color-adjust: exact !important;
-        }
-        
-        /* Hide everything by default */
-        body * {
-          visibility: hidden;
-        }
-
-        /* Show the print area */
-        .print-area, .print-area * {
-          visibility: visible !important;
-        }
-
-        .print-area {
-          position: fixed;
-          left: 0;
-          top: 0;
-          width: 100vw;
-          height: 100vh;
-          margin: 0;
-          padding: 0;
-          z-index: 9999;
-          background: white;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .certificate-container {
-          transform: scale(1); /* Ensure no scaling issues */
-          box-shadow: none !important;
-          margin: 0 !important;
-        }
-        
-        .no-print {
-          display: none !important;
-        }
+        @page { size: landscape; margin: 0; }
+        body { visibility: hidden; background: white; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        body * { visibility: hidden; }
+        .print-area, .print-area * { visibility: visible !important; }
+        .print-area { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; margin: 0; padding: 0; z-index: 9999; background: white; display: flex; align-items: center; justify-content: center; }
+        .certificate-container { transform: scale(1) !important; box-shadow: none !important; margin: 0 !important; }
+        .no-print { display: none !important; }
       }
     </style>
   <script type="importmap">
@@ -115,7 +103,7 @@
 }
 </script>
 </head>
-  <body class="bg-slate-100 text-slate-900">
+  <body class="bg-slate-50 text-slate-900 overflow-x-hidden">
     <div id="root"></div>
   </body>
 </html>
