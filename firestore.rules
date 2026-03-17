@@ -1,0 +1,167 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Fields:
+    //   - email: string (required, email)
+    //   - password: string (required)
+    //   - securityQuestion: string
+    //   - securityAnswer: string
+    //   - isAdmin: bool
+    //   - isApproved: bool (required)
+    //   - isBlocked: bool
+    //   - license: map (required)
+    //
+    // Collection: certificates
+    // Fields:
+    //   - id: string
+    //   - certificateNo: string (required)
+    //   - studentName: string (required)
+    //   - fatherName: string
+    //   - courseId: string (required)
+    //   - durationId: string (required)
+    //   - typeId: string (required)
+    //   - orientation: string (enum: landscape, portrait)
+    //   - dateOfJoining: string
+    //   - dateOfCompletion: string
+    //   - issueDate: string
+    //   - createdBy: string (required, uid)
+    //
+    // Collection: payments
+    // Fields:
+    //   - id: string
+    //   - userEmail: string (required, email)
+    //   - method: string (enum: easypaisa, sadapay, nayapay)
+    //   - senderName: string
+    //   - transactionId: string (required)
+    //   - amount: string (required)
+    //   - proofImage: string (base64)
+    //   - status: string (enum: pending, approved, rejected)
+    //   - date: string (date-time)
+    //
+    // Collection: activationKeys
+    // Fields:
+    //   - key: string (required)
+    //   - generatedDate: string (required)
+    //   - isUsed: bool (required)
+    //   - usedBy: string (email)
+    //   - durationDays: number (required)
+    //
+    // Collection: appSettings
+    // Fields:
+    //   - institute: map
+    //   - courses: list
+    //   - durations: list
+    //   - types: list
+    //   - activeTemplate: string
+    //   - appTheme: string
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true ||
+         (request.auth.token.email == "sohailsameer0@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return data.email is string && isValidEmail(data.email) &&
+             data.isApproved is bool &&
+             data.license is map &&
+             (data.isAdmin == null || data.isAdmin is bool) &&
+             (data.isBlocked == null || data.isBlocked is bool);
+    }
+
+    function isValidCertificate(data) {
+      return data.certificateNo is string && data.certificateNo.size() > 0 && data.certificateNo.size() < 100 &&
+             data.studentName is string && data.studentName.size() > 0 && data.studentName.size() < 200 &&
+             data.courseId is string &&
+             data.durationId is string &&
+             data.typeId is string &&
+             data.createdBy == request.auth.uid;
+    }
+
+    function isValidPayment(data) {
+      return data.userEmail is string && isValidEmail(data.userEmail) &&
+             data.transactionId is string && data.transactionId.size() > 0 && data.transactionId.size() < 100 &&
+             data.amount is string &&
+             data.status in ['pending', 'approved', 'rejected'];
+    }
+
+    function isValidKey(data) {
+      return data.key is string && data.key.size() > 0 &&
+             data.isUsed is bool &&
+             data.durationDays is number && data.durationDays > 0;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated() && isValidUser(request.resource.data) && 
+                    (isOwner(userId) && request.resource.data.isAdmin != true || isAdmin());
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) && 
+                    ((isOwner(userId) && request.resource.data.isAdmin == resource.data.isAdmin) || isAdmin());
+    }
+
+    match /certificates/{certId} {
+      allow read: if isAuthenticated() && (resource.data.createdBy == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidCertificate(request.resource.data);
+      allow update: if isAuthenticated() && isValidCertificate(request.resource.data) && 
+                    (resource.data.createdBy == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    match /payments/{paymentId} {
+      allow read: if isAuthenticated() && (resource.data.userEmail == request.auth.token.email || isAdmin());
+      allow create: if isAuthenticated() && isValidPayment(request.resource.data);
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /activationKeys/{keyId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /appSettings/{settingId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Default deny
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}

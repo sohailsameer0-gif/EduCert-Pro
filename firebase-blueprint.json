@@ -1,0 +1,127 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Information about a user, including license and approval status.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "password": { "type": "string" },
+        "securityQuestion": { "type": "string" },
+        "securityAnswer": { "type": "string" },
+        "isAdmin": { "type": "boolean" },
+        "isApproved": { "type": "boolean" },
+        "isBlocked": { "type": "boolean" },
+        "license": {
+          "type": "object",
+          "properties": {
+            "status": { "type": "string", "enum": ["trial", "active", "expired"] },
+            "plan": { "type": "string", "enum": ["free", "pro", "enterprise"] },
+            "expiryDate": { "type": "string", "format": "date-time" },
+            "deviceId": { "type": "string" },
+            "activationKey": { "type": "string" }
+          }
+        }
+      },
+      "required": ["email", "password", "isApproved", "license"]
+    },
+    "StudentCertificate": {
+      "title": "Student Certificate",
+      "description": "Data for a generated certificate.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "certificateNo": { "type": "string" },
+        "studentName": { "type": "string" },
+        "fatherName": { "type": "string" },
+        "courseId": { "type": "string" },
+        "durationId": { "type": "string" },
+        "typeId": { "type": "string" },
+        "orientation": { "type": "string", "enum": ["landscape", "portrait"] },
+        "dateOfJoining": { "type": "string" },
+        "dateOfCompletion": { "type": "string" },
+        "issueDate": { "type": "string" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["certificateNo", "studentName", "courseId", "durationId", "typeId", "createdBy"]
+    },
+    "PaymentRequest": {
+      "title": "Payment Request",
+      "description": "A request for license activation via payment proof.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userEmail": { "type": "string", "format": "email" },
+        "method": { "type": "string", "enum": ["easypaisa", "sadapay", "nayapay"] },
+        "senderName": { "type": "string" },
+        "transactionId": { "type": "string" },
+        "amount": { "type": "string" },
+        "proofImage": { "type": "string", "description": "Base64 encoded image" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "date": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userEmail", "method", "transactionId", "amount", "status", "date"]
+    },
+    "ActivationKey": {
+      "title": "Activation Key",
+      "description": "A key used to activate a license.",
+      "type": "object",
+      "properties": {
+        "key": { "type": "string" },
+        "generatedDate": { "type": "string", "format": "date-time" },
+        "isUsed": { "type": "boolean" },
+        "usedBy": { "type": "string", "format": "email" },
+        "durationDays": { "type": "number" }
+      },
+      "required": ["key", "generatedDate", "isUsed", "durationDays"]
+    },
+    "AppData": {
+      "title": "App Data",
+      "description": "Global settings for the institute.",
+      "type": "object",
+      "properties": {
+        "institute": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "address": { "type": "string" },
+            "phone": { "type": "string" },
+            "email": { "type": "string" },
+            "website": { "type": "string" },
+            "logo": { "type": "string" },
+            "seal": { "type": "string" },
+            "badge": { "type": "string" },
+            "signature": { "type": "string" }
+          }
+        },
+        "courses": { "type": "array", "items": { "type": "object" } },
+        "durations": { "type": "array", "items": { "type": "object" } },
+        "types": { "type": "array", "items": { "type": "object" } },
+        "activeTemplate": { "type": "string" },
+        "appTheme": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "users": {
+      "schema": "UserProfile",
+      "description": "Collection of user profiles."
+    },
+    "certificates": {
+      "schema": "StudentCertificate",
+      "description": "Collection of generated certificates."
+    },
+    "payments": {
+      "schema": "PaymentRequest",
+      "description": "Collection of payment requests."
+    },
+    "activationKeys": {
+      "schema": "ActivationKey",
+      "description": "Collection of activation keys."
+    },
+    "appSettings": {
+      "schema": "AppData",
+      "description": "Global application settings."
+    }
+  }
+}

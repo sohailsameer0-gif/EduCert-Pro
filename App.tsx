@@ -6,6 +6,8 @@ import { getAppData, findUser, saveUser, updateUserPassword, updateUserLicense, 
 import { SECURITY_QUESTIONS } from './constants';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
+import { signInWithGoogle } from './firebase';
+import { testConnection } from './services/firestore';
 
 // Components
 import AdminDashboard from './components/AdminDashboard';
@@ -18,6 +20,10 @@ type AuthMode = 'login' | 'signup' | 'forgot' | 'otp';
 function App() {
   const [appData, setAppData] = useState<AppData | null>(null);
   const [view, setView] = useState<ViewMode>('auth');
+
+  useEffect(() => {
+    testConnection();
+  }, []);
   
   // Auth State
   const [authMode, setAuthMode] = useState<AuthMode>('login');
@@ -152,6 +158,76 @@ function App() {
       }
     } else {
       setAuthMsg({ type: 'error', text: 'Invalid Credentials.' });
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    const googleUser = await signInWithGoogle();
+    
+    if (googleUser && googleUser.email) {
+      const email = googleUser.email.toLowerCase();
+      
+      // Strict Gmail Check
+      if (!email.endsWith('@gmail.com')) {
+         setAuthMsg({ type: 'error', text: 'Only @gmail.com accounts are allowed.' });
+         return;
+      }
+
+      let user = findUser(email);
+
+      // Auto-Register if user doesn't exist
+      if (!user) {
+         const newUser: UserProfile = {
+            email: email,
+            password: crypto.randomUUID(), // Random password since they use Google
+            securityQuestion: 'Auth Method',
+            securityAnswer: 'Google',
+            isApproved: false, // Default to pending approval
+            license: {} as any // Will be initialized by saveUser logic
+         };
+         
+         const success = saveUser(newUser);
+         if (success) {
+            user = findUser(email); // Retrieve the fully initialized user
+         } else {
+            setAuthMsg({ type: 'error', text: 'Error registering Google account.' });
+            return;
+         }
+      }
+
+      if (user) {
+          if (user.isBlocked) {
+            setAuthMsg({ type: 'error', text: 'Account Blocked. Contact Admin.' });
+            return;
+          }
+
+          setCurrentUser(user);
+          clearAuthForms();
+
+          // Routing Logic
+          if (user.isAdmin) {
+              setView('super_admin');
+              return;
+          }
+
+          if (!user.isApproved) {
+              setView('pending_approval');
+              return;
+          }
+          
+          // License Check
+          const isExpired = new Date(user.license.expiryDate) < new Date();
+          if (isExpired && user.license.status !== 'active') {
+            user.license.status = 'expired';
+            updateUserLicense(user.email, user.license);
+          }
+
+          if (user.license.status === 'expired') {
+            setView('license'); 
+          } else {
+            setView('generator');
+          }
+      }
     }
   };
 
@@ -525,8 +601,26 @@ function App() {
                   <button type="submit" className="w-full bg-gradient-to-r from-navy-900 to-navy-800 hover:from-navy-800 hover:to-navy-700 text-white py-3.5 rounded-xl font-bold transition shadow-lg transform active:scale-[0.98]">
                     Login to Dashboard
                   </button>
+
+                  <div className="relative my-4">
+                      <div className="absolute inset-0 flex items-center">
+                          <div className="w-full border-t border-slate-200"></div>
+                      </div>
+                      <div className="relative flex justify-center text-sm">
+                          <span className="px-2 bg-white text-slate-500 font-medium">Or continue with</span>
+                      </div>
+                  </div>
+
+                  <button 
+                      type="button"
+                      onClick={handleGoogleSignIn}
+                      className="w-full bg-white border border-slate-300 text-slate-700 py-3 rounded-xl font-bold hover:bg-slate-50 transition shadow-sm flex items-center justify-center gap-3"
+                  >
+                      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="Google" />
+                      Sign in with Google
+                  </button>
                   
-                  <div className="text-center text-sm text-slate-500 mt-6 pt-4 border-t border-slate-100">
+                  <div className="text-center text-sm text-slate-500 mt-4 pt-2 border-t border-slate-100">
                      New Institute? <button type="button" onClick={() => { clearAuthForms(); setAuthMode('signup'); }} className="text-indigo-600 font-bold hover:underline ml-1">Register Now</button>
                   </div>
                 </form>
